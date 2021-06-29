@@ -1,0 +1,9 @@
+[package]
+name = "wasm-nes"
+version = "0.1.0"
+authors = ["Lucien Le Roux <rshn.kabu@gmail.com>"]
+edition = "2018"
+
+# https://doc.rust-lang.org/reference/linkage.html
+# [lib]
+# crate-type = ["cdylib"]

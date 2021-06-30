@@ -742,7 +742,7 @@ fn php (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
         panic!("Invalid addressing mode");
     };
 
-    cpu.push_stack(memory, cpu.status | (StatusFlag::Break as u8));
+    cpu.push_stack(memory, cpu.status | (StatusFlag::Break as u8) | (StatusFlag::Unused as u8));
 }
 
 /**
@@ -767,9 +767,9 @@ fn plp (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
         panic!("Invalid addressing mode");
     };
 
-    let status = cpu.pop_stack(memory);
-    println!("{:08b} <- {:08b}", cpu.status, status);
-    cpu.status = (status & !(StatusFlag::Break as u8)) | (cpu.status & (StatusFlag::Break as u8));
+    // Ignored flags
+    let mask = (StatusFlag::Break as u8) | (StatusFlag::Unused as u8);
+    cpu.status = (cpu.pop_stack(memory) & !mask) | (cpu.status & mask);
 }
 
 /**

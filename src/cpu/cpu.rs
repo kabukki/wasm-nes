@@ -7,6 +7,7 @@ pub enum StatusFlag {
     Interrupt   = 0b00000100,
     Decimal     = 0b00001000,
     Break       = 0b00010000,
+    Unused      = 0b00100000,
     Overflow    = 0b01000000,
     Negative    = 0b10000000,
 }

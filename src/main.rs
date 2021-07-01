@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use wasm_nes::cpu::cpu::Cpu;
+use wasm_nes::cpu::instruction;
 use wasm_nes::cpu::memory::{Memory, MEMORY_CARTRIDGE_PRG_LOWER_START, MEMORY_CARTRIDGE_PRG_UPPER_START, MEMORY_CARTRIDGE_PRG_UPPER_SIZE};
 
 /**
@@ -36,6 +37,9 @@ impl State {
 }
 
 fn main() {
+    let (total, implemented) = instruction::coverage();
+    println!("CPU ASI coverage: {} / {} legal", implemented, total);
+
     let rom: String = env::args().nth(1).expect("Missing mandatory ROM file");
     println!("--- Using ROM: {} ---", rom);
 
@@ -65,7 +69,7 @@ fn main() {
         if pass {
             println!("✅ Logs match");
         } else {
-            println!("❌ Logs differ");
+            println!("❌ Logs differ on line {}", n + 1);
             break;
         }
 

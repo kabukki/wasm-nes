@@ -1,5 +1,6 @@
 use crate::cpu::cpu::{Cpu, StatusFlag};
 use crate::cpu::memory::Memory;
+use crate::cpu::interrupt::Interrupt;
 
 type InstructionHandler = fn (&mut Cpu, Operand, &mut Memory);
 
@@ -71,7 +72,7 @@ impl std::fmt::Display for Operand {
         match self {
             Operand::None => write!(f, "None"),
             Operand::Byte (value) => write!(f, "{} ({:#0x})", value, value),
-            Operand::Address (address) => write!(f, "{:#018x}", address),
+            Operand::Address (address) => write!(f, "{:#0x}", address),
         }
     }
 }
@@ -101,44 +102,59 @@ impl Instruction {
                 Operand::Address(cpu.pc.wrapping_add(value as u16))
             },
             AddressingMode::Absolute => {
-                let value = (memory.read(cpu.pc + 1) as u16) << 8 | memory.read(cpu.pc) as u16;
+                let value = (memory.read(cpu.pc.wrapping_add(1)) as u16) << 8 | memory.read(cpu.pc) as u16;
                 cpu.pc += 2;
                 Operand::Address(value)
             },
             AddressingMode::AbsoluteX => {
-                let value = (memory.read(cpu.pc + 1) as u16) << 8 | memory.read(cpu.pc) as u16;
+                let value = (memory.read(cpu.pc.wrapping_add(1)) as u16) << 8 | memory.read(cpu.pc) as u16;
                 cpu.pc += 2;
-                Operand::Address(value + cpu.x as u16)
+                Operand::Address(value.wrapping_add(cpu.x as u16))
             },
             AddressingMode::AbsoluteY => {
-                let value = (memory.read(cpu.pc + 1) as u16) << 8 | memory.read(cpu.pc) as u16;
+                let value = (memory.read(cpu.pc.wrapping_add(1)) as u16) << 8 | memory.read(cpu.pc) as u16;
                 cpu.pc += 2;
-                Operand::Address(value + cpu.y as u16)
+                Operand::Address(value.wrapping_add(cpu.y as u16))
             },
             AddressingMode::ZeroPage => {
-                let value = memory.read(cpu.pc) as u16;
+                let address = memory.read(cpu.pc) as u16;
                 cpu.pc += 1;
-                Operand::Address(value)
+                Operand::Address(address)
             },
             AddressingMode::ZeroPageX => {
-                let value = memory.read(cpu.pc);
+                let address = memory.read(cpu.pc).wrapping_add(cpu.x) as u16;
                 cpu.pc += 1;
-                Operand::Address(value.wrapping_add(cpu.x) as u16)
+                Operand::Address(address)
             },
             AddressingMode::ZeroPageY => {
-                let value = memory.read(cpu.pc);
+                let address = memory.read(cpu.pc).wrapping_add(cpu.y) as u16;
                 cpu.pc += 1;
-                Operand::Address(value.wrapping_add(cpu.y) as u16)
+                Operand::Address(address)
             },
             AddressingMode::Indirect => {
-                let ptr = (memory.read(cpu.pc + 1) as u16) << 8 | memory.read(cpu.pc) as u16;
-                let address = (memory.read(ptr) as u16) << 8 | memory.read(ptr + 1) as u16;
+                let ptr = (memory.read(cpu.pc.wrapping_add(1)) as u16) << 8 | memory.read(cpu.pc) as u16;
+
+                // Simulate fetch error @ page boundary
+                let page = ptr & 0xFF00;
+                let address = (memory.read(page | (ptr as u8).wrapping_add(1) as u16) as u16) << 8 | memory.read(ptr) as u16;
 
                 cpu.pc += 2;
                 Operand::Address(address)
             },
-            // AddressingMode::IndirectX => {}
-            // AddressingMode::IndirectY,
+            AddressingMode::IndirectX => {
+                let ptr = memory.read(cpu.pc).wrapping_add(cpu.x);
+                let address = (memory.read(ptr.wrapping_add(1) as u16) as u16) << 8 | memory.read(ptr as u16) as u16;
+
+                cpu.pc += 1;
+                Operand::Address(address)
+            },
+            AddressingMode::IndirectY => {
+                let ptr = memory.read(cpu.pc);
+                let address = (memory.read(ptr.wrapping_add(1) as u16) as u16) << 8 | memory.read(ptr as u16) as u16;
+
+                cpu.pc += 1;
+                Operand::Address(address.wrapping_add(cpu.y as u16))
+            },
             _ => Operand::None,
         };
         let extra = 0; // TODO extra cycles based on policy: page boundary, branching... returned along operand
@@ -152,7 +168,7 @@ impl Instruction {
 }
 
 pub const INSTRUCTIONS: [Instruction; 256] = [
-    Instruction { opcode: 0x00, name: "BRK", mode: AddressingMode::Implied,     cycles: 2, handler: unimplemented,  illegal: false  },
+    Instruction { opcode: 0x00, name: "BRK", mode: AddressingMode::Implied,     cycles: 7, handler: brk,            illegal: false  },
     Instruction { opcode: 0x01, name: "ORA", mode: AddressingMode::IndirectX,   cycles: 2, handler: ora,            illegal: false  },
     Instruction { opcode: 0x02, name: "KIL", mode: AddressingMode::Implied,     cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0x03, name: "SLO", mode: AddressingMode::IndirectX,   cycles: 2, handler: unimplemented,  illegal: true   },
@@ -181,7 +197,7 @@ pub const INSTRUCTIONS: [Instruction; 256] = [
     Instruction { opcode: 0x19, name: "ORA", mode: AddressingMode::AbsoluteY,   cycles: 2, handler: ora,            illegal: false  },
     Instruction { opcode: 0x1A, name: "NOP", mode: AddressingMode::Implied,     cycles: 2, handler: nop,            illegal: true   },
     Instruction { opcode: 0x1B, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
-    Instruction { opcode: 0x1C, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0x1C, name: "NOP", mode: AddressingMode::AbsoluteX,   cycles: 4, handler: nop,            illegal: true   },
     Instruction { opcode: 0x1D, name: "ORA", mode: AddressingMode::AbsoluteX,   cycles: 2, handler: ora,            illegal: false  },
     Instruction { opcode: 0x1E, name: "ASL", mode: AddressingMode::AbsoluteX,   cycles: 2, handler: asl,            illegal: false  },
     Instruction { opcode: 0x1F, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
@@ -224,7 +240,7 @@ pub const INSTRUCTIONS: [Instruction; 256] = [
     Instruction { opcode: 0x41, name: "EOR", mode: AddressingMode::IndirectX,   cycles: 2, handler: eor,            illegal: false  },
     Instruction { opcode: 0x42, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0x43, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
-    Instruction { opcode: 0x44, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0x44, name: "NOP", mode: AddressingMode::ZeroPage,    cycles: 3, handler: nop,            illegal: true   },
     Instruction { opcode: 0x45, name: "EOR", mode: AddressingMode::ZeroPage,    cycles: 2, handler: eor,            illegal: false  },
     Instruction { opcode: 0x46, name: "LSR", mode: AddressingMode::ZeroPage,    cycles: 2, handler: lsr,            illegal: false  },
     Instruction { opcode: 0x47, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
@@ -241,15 +257,15 @@ pub const INSTRUCTIONS: [Instruction; 256] = [
     Instruction { opcode: 0x51, name: "EOR", mode: AddressingMode::IndirectY,   cycles: 2, handler: eor,            illegal: false  },
     Instruction { opcode: 0x52, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0x53, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
-    Instruction { opcode: 0x54, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0x54, name: "NOP", mode: AddressingMode::ZeroPageX,   cycles: 4, handler: nop,            illegal: true   },
     Instruction { opcode: 0x55, name: "EOR", mode: AddressingMode::ZeroPageX,   cycles: 2, handler: eor,            illegal: false  },
     Instruction { opcode: 0x56, name: "LSR", mode: AddressingMode::ZeroPageX,   cycles: 2, handler: lsr,            illegal: false  },
     Instruction { opcode: 0x57, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0x58, name: "CLI", mode: AddressingMode::Implied,     cycles: 2, handler: unimplemented,  illegal: false  },
     Instruction { opcode: 0x59, name: "EOR", mode: AddressingMode::AbsoluteY,   cycles: 2, handler: eor,            illegal: false  },
-    Instruction { opcode: 0x5A, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0x5A, name: "NOP", mode: AddressingMode::Implied,     cycles: 2, handler: nop,            illegal: true   },
     Instruction { opcode: 0x5B, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
-    Instruction { opcode: 0x5C, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0x5C, name: "NOP", mode: AddressingMode::AbsoluteX,   cycles: 4, handler: nop,            illegal: true   },
     Instruction { opcode: 0x5D, name: "EOR", mode: AddressingMode::AbsoluteX,   cycles: 2, handler: eor,            illegal: false  },
     Instruction { opcode: 0x5E, name: "LSR", mode: AddressingMode::AbsoluteX,   cycles: 2, handler: lsr,            illegal: false  },
     Instruction { opcode: 0x5F, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
@@ -258,7 +274,7 @@ pub const INSTRUCTIONS: [Instruction; 256] = [
     Instruction { opcode: 0x61, name: "ADC", mode: AddressingMode::IndirectX,   cycles: 2, handler: adc,            illegal: false  },
     Instruction { opcode: 0x62, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0x63, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
-    Instruction { opcode: 0x64, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0x64, name: "NOP", mode: AddressingMode::ZeroPage,    cycles: 3, handler: nop,            illegal: true   },
     Instruction { opcode: 0x65, name: "ADC", mode: AddressingMode::ZeroPage,    cycles: 2, handler: adc,            illegal: false  },
     Instruction { opcode: 0x66, name: "ROR", mode: AddressingMode::ZeroPage,    cycles: 2, handler: ror,            illegal: false  },
     Instruction { opcode: 0x67, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
@@ -275,24 +291,24 @@ pub const INSTRUCTIONS: [Instruction; 256] = [
     Instruction { opcode: 0x71, name: "ADC", mode: AddressingMode::IndirectY,   cycles: 2, handler: adc,            illegal: false  },
     Instruction { opcode: 0x72, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0x73, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
-    Instruction { opcode: 0x74, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0x74, name: "NOP", mode: AddressingMode::ZeroPageX,   cycles: 4, handler: nop,            illegal: true   },
     Instruction { opcode: 0x75, name: "ADC", mode: AddressingMode::ZeroPageX,   cycles: 2, handler: adc,            illegal: false  },
     Instruction { opcode: 0x76, name: "ROR", mode: AddressingMode::ZeroPageX,   cycles: 2, handler: ror,            illegal: false  },
     Instruction { opcode: 0x77, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0x78, name: "SEI", mode: AddressingMode::Implied,     cycles: 2, handler: sei,            illegal: false  },
     Instruction { opcode: 0x79, name: "ADC", mode: AddressingMode::AbsoluteY,   cycles: 2, handler: adc,            illegal: false  },
-    Instruction { opcode: 0x7A, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0x7A, name: "NOP", mode: AddressingMode::Implied,     cycles: 2, handler: nop,            illegal: true   },
     Instruction { opcode: 0x7B, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
-    Instruction { opcode: 0x7C, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0x7C, name: "NOP", mode: AddressingMode::AbsoluteX,   cycles: 4, handler: nop,            illegal: true   },
     Instruction { opcode: 0x7D, name: "ADC", mode: AddressingMode::AbsoluteX,   cycles: 2, handler: adc,            illegal: false  },
     Instruction { opcode: 0x7E, name: "ROR", mode: AddressingMode::AbsoluteX,   cycles: 2, handler: ror,            illegal: false  },
     Instruction { opcode: 0x7F, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
 
-    Instruction { opcode: 0x80, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0x80, name: "NOP", mode: AddressingMode::Immediate,   cycles: 3, handler: nop,            illegal: true   },
     Instruction { opcode: 0x81, name: "STA", mode: AddressingMode::IndirectX,   cycles: 2, handler: sta,            illegal: false  },
     Instruction { opcode: 0x82, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0x83, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
-    Instruction { opcode: 0x84, name: "STY", mode: AddressingMode::ZeroPage,    cycles: 2, handler: unimplemented,  illegal: false  },
+    Instruction { opcode: 0x84, name: "STY", mode: AddressingMode::ZeroPage,    cycles: 2, handler: sty,            illegal: false  },
     Instruction { opcode: 0x85, name: "STA", mode: AddressingMode::ZeroPage,    cycles: 2, handler: sta,            illegal: false  },
     Instruction { opcode: 0x86, name: "STX", mode: AddressingMode::ZeroPage,    cycles: 2, handler: stx,            illegal: false  },
     Instruction { opcode: 0x87, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
@@ -300,7 +316,7 @@ pub const INSTRUCTIONS: [Instruction; 256] = [
     Instruction { opcode: 0x89, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0x8A, name: "TXA", mode: AddressingMode::Implied,     cycles: 2, handler: txa,            illegal: false  },
     Instruction { opcode: 0x8B, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
-    Instruction { opcode: 0x8C, name: "STY", mode: AddressingMode::Absolute,    cycles: 2, handler: unimplemented,  illegal: false  },
+    Instruction { opcode: 0x8C, name: "STY", mode: AddressingMode::Absolute,    cycles: 2, handler: sty,            illegal: false  },
     Instruction { opcode: 0x8D, name: "STA", mode: AddressingMode::Absolute,    cycles: 2, handler: sta,            illegal: false  },
     Instruction { opcode: 0x8E, name: "STX", mode: AddressingMode::Absolute,    cycles: 2, handler: stx,            illegal: false  },
     Instruction { opcode: 0x8F, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
@@ -309,7 +325,7 @@ pub const INSTRUCTIONS: [Instruction; 256] = [
     Instruction { opcode: 0x91, name: "STA", mode: AddressingMode::IndirectY,   cycles: 2, handler: sta,            illegal: false  },
     Instruction { opcode: 0x92, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0x93, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
-    Instruction { opcode: 0x94, name: "STY", mode: AddressingMode::ZeroPageX,   cycles: 2, handler: unimplemented,  illegal: false  },
+    Instruction { opcode: 0x94, name: "STY", mode: AddressingMode::ZeroPageX,   cycles: 2, handler: sty,            illegal: false  },
     Instruction { opcode: 0x95, name: "STA", mode: AddressingMode::ZeroPageX,   cycles: 2, handler: sta,            illegal: false  },
     Instruction { opcode: 0x96, name: "STX", mode: AddressingMode::ZeroPageY,   cycles: 2, handler: stx,            illegal: false  },
     Instruction { opcode: 0x97, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
@@ -323,10 +339,10 @@ pub const INSTRUCTIONS: [Instruction; 256] = [
     Instruction { opcode: 0x9F, name: "SHA", mode: AddressingMode::AbsoluteY,   cycles: 2, handler: unimplemented,  illegal: true   },
 
     Instruction { opcode: 0xA0, name: "LDY", mode: AddressingMode::Immediate,   cycles: 2, handler: ldy,            illegal: false  },
-    Instruction { opcode: 0xA1, name: "LDA", mode: AddressingMode::IndirectX,   cycles: 2, handler: lda,            illegal: false  },
+    Instruction { opcode: 0xA1, name: "LDA", mode: AddressingMode::IndirectX,   cycles: 6, handler: lda,            illegal: false  },
     Instruction { opcode: 0xA2, name: "LDX", mode: AddressingMode::Immediate,   cycles: 2, handler: ldx,            illegal: false  },
     Instruction { opcode: 0xA3, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
-    Instruction { opcode: 0xA4, name: "LDY", mode: AddressingMode::ZeroPage,    cycles: 2, handler: ldy,            illegal: false  },
+    Instruction { opcode: 0xA4, name: "LDY", mode: AddressingMode::ZeroPage,    cycles: 3, handler: ldy,            illegal: false  },
     Instruction { opcode: 0xA5, name: "LDA", mode: AddressingMode::ZeroPage,    cycles: 2, handler: lda,            illegal: false  },
     Instruction { opcode: 0xA6, name: "LDX", mode: AddressingMode::ZeroPage,    cycles: 2, handler: ldx,            illegal: false  },
     Instruction { opcode: 0xA7, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
@@ -362,7 +378,7 @@ pub const INSTRUCTIONS: [Instruction; 256] = [
     Instruction { opcode: 0xC3, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0xC4, name: "CPY", mode: AddressingMode::ZeroPage,    cycles: 2, handler: cpy,            illegal: false  },
     Instruction { opcode: 0xC5, name: "CMP", mode: AddressingMode::ZeroPage,    cycles: 2, handler: cmp,            illegal: false  },
-    Instruction { opcode: 0xC6, name: "DEC", mode: AddressingMode::ZeroPage,    cycles: 2, handler: unimplemented,  illegal: false  },
+    Instruction { opcode: 0xC6, name: "DEC", mode: AddressingMode::ZeroPage,    cycles: 2, handler: dec,            illegal: false  },
     Instruction { opcode: 0xC7, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0xC8, name: "INY", mode: AddressingMode::Implied,     cycles: 2, handler: iny,            illegal: false  },
     Instruction { opcode: 0xC9, name: "CMP", mode: AddressingMode::Immediate,   cycles: 2, handler: cmp,            illegal: false  },
@@ -370,24 +386,24 @@ pub const INSTRUCTIONS: [Instruction; 256] = [
     Instruction { opcode: 0xCB, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0xCC, name: "CPY", mode: AddressingMode::Absolute,    cycles: 2, handler: cpy,            illegal: false  },
     Instruction { opcode: 0xCD, name: "CMP", mode: AddressingMode::Absolute,    cycles: 2, handler: cmp,            illegal: false  },
-    Instruction { opcode: 0xCE, name: "DEC", mode: AddressingMode::Absolute,    cycles: 2, handler: unimplemented,  illegal: false  },
+    Instruction { opcode: 0xCE, name: "DEC", mode: AddressingMode::Absolute,    cycles: 2, handler: dec,            illegal: false  },
     Instruction { opcode: 0xCF, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
 
     Instruction { opcode: 0xD0, name: "BNE", mode: AddressingMode::Relative,    cycles: 2, handler: bne,            illegal: false  },
     Instruction { opcode: 0xD1, name: "CMP", mode: AddressingMode::IndirectY,   cycles: 2, handler: cmp,            illegal: false  },
     Instruction { opcode: 0xD2, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0xD3, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
-    Instruction { opcode: 0xD4, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0xD4, name: "NOP", mode: AddressingMode::ZeroPageX,   cycles: 4, handler: nop,            illegal: true   },
     Instruction { opcode: 0xD5, name: "CMP", mode: AddressingMode::ZeroPageX,   cycles: 2, handler: cmp,            illegal: false  },
-    Instruction { opcode: 0xD6, name: "DEC", mode: AddressingMode::ZeroPageX,   cycles: 2, handler: unimplemented,  illegal: false  },
+    Instruction { opcode: 0xD6, name: "DEC", mode: AddressingMode::ZeroPageX,   cycles: 2, handler: dec,            illegal: false  },
     Instruction { opcode: 0xD7, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0xD8, name: "CLD", mode: AddressingMode::Implied,     cycles: 2, handler: cld,            illegal: false  },
     Instruction { opcode: 0xD9, name: "CMP", mode: AddressingMode::AbsoluteY,   cycles: 2, handler: cmp,            illegal: false  },
-    Instruction { opcode: 0xDA, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0xDA, name: "NOP", mode: AddressingMode::Implied,     cycles: 2, handler: nop,            illegal: true   },
     Instruction { opcode: 0xDB, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
-    Instruction { opcode: 0xDC, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0xDC, name: "NOP", mode: AddressingMode::AbsoluteX,   cycles: 4, handler: nop,            illegal: true   },
     Instruction { opcode: 0xDD, name: "CMP", mode: AddressingMode::AbsoluteX,   cycles: 2, handler: cmp,            illegal: false  },
-    Instruction { opcode: 0xDE, name: "DEC", mode: AddressingMode::AbsoluteX,   cycles: 2, handler: unimplemented,  illegal: false  },
+    Instruction { opcode: 0xDE, name: "DEC", mode: AddressingMode::AbsoluteX,   cycles: 2, handler: dec,            illegal: false  },
     Instruction { opcode: 0xDF, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
 
     Instruction { opcode: 0xE0, name: "CPX", mode: AddressingMode::Immediate,   cycles: 2, handler: cpx,            illegal: false  },
@@ -411,15 +427,15 @@ pub const INSTRUCTIONS: [Instruction; 256] = [
     Instruction { opcode: 0xF1, name: "SBC", mode: AddressingMode::IndirectY,   cycles: 2, handler: sbc,            illegal: false  },
     Instruction { opcode: 0xF2, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0xF3, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
-    Instruction { opcode: 0xF4, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0xF4, name: "NOP", mode: AddressingMode::ZeroPageX,   cycles: 4, handler: nop,            illegal: true   },
     Instruction { opcode: 0xF5, name: "SBC", mode: AddressingMode::ZeroPageX,   cycles: 2, handler: sbc,            illegal: false  },
     Instruction { opcode: 0xF6, name: "INC", mode: AddressingMode::ZeroPageX,   cycles: 2, handler: inc,            illegal: false  },
     Instruction { opcode: 0xF7, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
     Instruction { opcode: 0xF8, name: "SED", mode: AddressingMode::Implied,     cycles: 2, handler: sed,            illegal: false  },
     Instruction { opcode: 0xF9, name: "SBC", mode: AddressingMode::AbsoluteY,   cycles: 2, handler: sbc,            illegal: false  },
-    Instruction { opcode: 0xFA, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0xFA, name: "NOP", mode: AddressingMode::Implied,     cycles: 2, handler: nop,            illegal: true   },
     Instruction { opcode: 0xFB, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
-    Instruction { opcode: 0xFC, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
+    Instruction { opcode: 0xFC, name: "NOP", mode: AddressingMode::AbsoluteX,   cycles: 4, handler: nop,            illegal: true   },
     Instruction { opcode: 0xFD, name: "SBC", mode: AddressingMode::AbsoluteX,   cycles: 2, handler: sbc,            illegal: false  },
     Instruction { opcode: 0xFE, name: "INC", mode: AddressingMode::AbsoluteX,   cycles: 2, handler: inc,            illegal: false  },
     Instruction { opcode: 0xFF, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
@@ -593,6 +609,27 @@ fn bpl (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 }
 
 /**
+ * Force Break
+ */
+fn brk (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+    if operand != Operand::None {
+        panic!("Invalid addressing mode");
+    }
+
+    let (hi, lo) = (((cpu.pc + 2) >> 8) as u8, (cpu.pc + 2) as u8);
+    cpu.push_stack(memory, hi);
+    cpu.push_stack(memory, lo);
+
+    cpu.set_flag(StatusFlag::Break, true);
+    cpu.push_stack(memory, cpu.status);
+
+    cpu.set_flag(StatusFlag::Interrupt, true);
+
+    let address = (memory.read(Interrupt::IRQ as u16 + 1) as u16) << 8 | memory.read(Interrupt::IRQ as u16) as u16;
+    cpu.pc = address;
+}
+
+/**
  * Branch on Overflow Clear
  */
 fn bvc (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
@@ -696,6 +733,22 @@ fn cpy (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
     cpu.set_flag(StatusFlag::Carry, cpu.y >= value);
     cpu.set_flag(StatusFlag::Zero, cpu.y == value);
     cpu.set_flag(StatusFlag::Negative, (cpu.y.wrapping_sub(value) as i8) < 0);
+}
+
+/**
+ * Decrement Memory by One
+ */
+fn dec (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+    let address = match operand {
+        Operand::Address (address) => address,
+        _ => panic!("Invalid addressing mode"),
+    };
+
+    let value = memory.read(address).wrapping_sub(1);
+    memory.write(address, value);
+
+    cpu.set_flag(StatusFlag::Zero, value == 0);
+    cpu.set_flag(StatusFlag::Negative, (value as i8) < 0);
 }
 
 /**
@@ -940,7 +993,6 @@ fn pla (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
         _ => panic!("Invalid addressing mode"),
     };
 
-    println!("{:08b} {} {}", value, value, value as i8);
     cpu.a = value;
 
     cpu.set_flag(StatusFlag::Zero, cpu.a == 0);
@@ -1113,6 +1165,18 @@ fn stx (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
     };
 
     memory.write(address, cpu.x);
+}
+
+/**
+ * Store Index Y in Memory
+ */
+fn sty (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+    let address = match operand {
+        Operand::Address (address) => address,
+        _ => panic!("Invalid addressing mode"),
+    };
+
+    memory.write(address, cpu.y);
 }
 
 /**

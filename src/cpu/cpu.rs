@@ -2,14 +2,14 @@ use crate::cpu::memory::{Memory, MEMORY_RAM_STACK_START};
 use crate::cpu::instruction::INSTRUCTIONS;
 
 pub enum StatusFlag {
-    Carry       = 0b00000001,
-    Zero        = 0b00000010,
-    Interrupt   = 0b00000100,
-    Decimal     = 0b00001000,
-    Break       = 0b00010000,
-    Unused      = 0b00100000,
-    Overflow    = 0b01000000,
-    Negative    = 0b10000000,
+    Carry       = 0b0000_0001,
+    Zero        = 0b0000_0010,
+    Interrupt   = 0b0000_0100,
+    Decimal     = 0b0000_1000,
+    Break       = 0b0001_0000,
+    Unused      = 0b0010_0000,
+    Overflow    = 0b0100_0000,
+    Negative    = 0b1000_0000,
 }
 
 /**

@@ -1,5 +1,9 @@
-use crate::cpu::memory::{Memory, MEMORY_RAM_STACK_START};
+use crate::bus::{Bus, MEMORY_RAM_STACK_START};
 use crate::cpu::instruction::INSTRUCTIONS;
+use crate::cpu::interrupt::Interrupt;
+
+mod instruction;
+pub mod interrupt;
 
 pub enum StatusFlag {
     Carry       = 0b0000_0001,
@@ -65,22 +69,26 @@ impl Cpu {
         };
     }
 
-    pub fn cycle (&mut self, memory: &mut Memory) {
-        let instruction = &INSTRUCTIONS[memory.read(self.pc) as usize];
+    pub fn reset (&mut self, bus: &Bus) {
+        self.pc = (bus.read(Interrupt::RESET as u16 + 1) as u16) << 8 | bus.read(Interrupt::RESET as u16) as u16;
+    }
+
+    pub fn cycle (&mut self, bus: &mut Bus) {
+        let instruction = &INSTRUCTIONS[bus.read(self.pc) as usize];
         self.pc += 1;
     
-        let cycles = instruction.execute(self, memory);
+        let cycles = instruction.execute(self, bus);
         self.cycles += cycles as usize;
     }
 
-    pub fn push_stack (&mut self, memory: &mut Memory, data: u8) {
-        memory.write(MEMORY_RAM_STACK_START + self.sp as u16, data);
+    pub fn push_stack (&mut self, bus: &mut Bus, data: u8) {
+        bus.write(MEMORY_RAM_STACK_START + self.sp as u16, data);
         self.sp = self.sp.wrapping_sub(1);
     }
 
-    pub fn pop_stack (&mut self, memory: &mut Memory) -> u8 {
+    pub fn pop_stack (&mut self, bus: &mut Bus) -> u8 {
         self.sp = self.sp.wrapping_add(1);
-        memory.read(MEMORY_RAM_STACK_START + self.sp as u16)
+        bus.read(MEMORY_RAM_STACK_START + self.sp as u16)
     }
 
     pub fn set_flag (&mut self, flag: StatusFlag, condition: bool) {

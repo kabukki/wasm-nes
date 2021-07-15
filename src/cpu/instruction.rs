@@ -1,8 +1,8 @@
-use crate::cpu::cpu::{Cpu, StatusFlag};
-use crate::cpu::memory::Memory;
+use crate::bus::Bus;
+use crate::cpu::{Cpu, StatusFlag};
 use crate::cpu::interrupt::Interrupt;
 
-type InstructionHandler = fn (&mut Cpu, Operand, &mut Memory);
+type InstructionHandler = fn (&mut Cpu, Operand, &mut Bus);
 
 #[derive(Debug, Copy, Clone)]
 pub enum AddressingMode {
@@ -87,70 +87,70 @@ pub struct Instruction {
 }
 
 impl Instruction {
-    pub fn execute (&self, cpu: &mut Cpu, memory: &mut Memory) -> u8 {
+    pub fn execute (&self, cpu: &mut Cpu, bus: &mut Bus) -> u8 {
         let operand = match self.mode {
             AddressingMode::Implied => Operand::None,
             AddressingMode::Accumulator => Operand::None,
             AddressingMode::Immediate => {
-                let value = memory.read(cpu.pc);
+                let value = bus.read(cpu.pc);
                 cpu.pc += 1;
                 Operand::Byte(value)
             },
             AddressingMode::Relative => {
-                let value = memory.read(cpu.pc) as i8;
+                let value = bus.read(cpu.pc) as i8;
                 cpu.pc += 1;
                 Operand::Address(cpu.pc.wrapping_add(value as u16))
             },
             AddressingMode::Absolute => {
-                let value = (memory.read(cpu.pc.wrapping_add(1)) as u16) << 8 | memory.read(cpu.pc) as u16;
+                let value = (bus.read(cpu.pc.wrapping_add(1)) as u16) << 8 | bus.read(cpu.pc) as u16;
                 cpu.pc += 2;
                 Operand::Address(value)
             },
             AddressingMode::AbsoluteX => {
-                let value = (memory.read(cpu.pc.wrapping_add(1)) as u16) << 8 | memory.read(cpu.pc) as u16;
+                let value = (bus.read(cpu.pc.wrapping_add(1)) as u16) << 8 | bus.read(cpu.pc) as u16;
                 cpu.pc += 2;
                 Operand::Address(value.wrapping_add(cpu.x as u16))
             },
             AddressingMode::AbsoluteY => {
-                let value = (memory.read(cpu.pc.wrapping_add(1)) as u16) << 8 | memory.read(cpu.pc) as u16;
+                let value = (bus.read(cpu.pc.wrapping_add(1)) as u16) << 8 | bus.read(cpu.pc) as u16;
                 cpu.pc += 2;
                 Operand::Address(value.wrapping_add(cpu.y as u16))
             },
             AddressingMode::ZeroPage => {
-                let address = memory.read(cpu.pc) as u16;
+                let address = bus.read(cpu.pc) as u16;
                 cpu.pc += 1;
                 Operand::Address(address)
             },
             AddressingMode::ZeroPageX => {
-                let address = memory.read(cpu.pc).wrapping_add(cpu.x) as u16;
+                let address = bus.read(cpu.pc).wrapping_add(cpu.x) as u16;
                 cpu.pc += 1;
                 Operand::Address(address)
             },
             AddressingMode::ZeroPageY => {
-                let address = memory.read(cpu.pc).wrapping_add(cpu.y) as u16;
+                let address = bus.read(cpu.pc).wrapping_add(cpu.y) as u16;
                 cpu.pc += 1;
                 Operand::Address(address)
             },
             AddressingMode::Indirect => {
-                let ptr = (memory.read(cpu.pc.wrapping_add(1)) as u16) << 8 | memory.read(cpu.pc) as u16;
+                let ptr = (bus.read(cpu.pc.wrapping_add(1)) as u16) << 8 | bus.read(cpu.pc) as u16;
 
                 // Simulate fetch error @ page boundary
                 let page = ptr & 0xFF00;
-                let address = (memory.read(page | (ptr as u8).wrapping_add(1) as u16) as u16) << 8 | memory.read(ptr) as u16;
+                let address = (bus.read(page | (ptr as u8).wrapping_add(1) as u16) as u16) << 8 | bus.read(ptr) as u16;
 
                 cpu.pc += 2;
                 Operand::Address(address)
             },
             AddressingMode::IndirectX => {
-                let ptr = memory.read(cpu.pc).wrapping_add(cpu.x);
-                let address = (memory.read(ptr.wrapping_add(1) as u16) as u16) << 8 | memory.read(ptr as u16) as u16;
+                let ptr = bus.read(cpu.pc).wrapping_add(cpu.x);
+                let address = (bus.read(ptr.wrapping_add(1) as u16) as u16) << 8 | bus.read(ptr as u16) as u16;
 
                 cpu.pc += 1;
                 Operand::Address(address)
             },
             AddressingMode::IndirectY => {
-                let ptr = memory.read(cpu.pc);
-                let address = (memory.read(ptr.wrapping_add(1) as u16) as u16) << 8 | memory.read(ptr as u16) as u16;
+                let ptr = bus.read(cpu.pc);
+                let address = (bus.read(ptr.wrapping_add(1) as u16) as u16) << 8 | bus.read(ptr as u16) as u16;
 
                 cpu.pc += 1;
                 Operand::Address(address.wrapping_add(cpu.y as u16))
@@ -161,7 +161,7 @@ impl Instruction {
 
         // log (operand, self.mode)
         println!("  {:02X} [{} {:#?}] {}", self.opcode, self.name, self.mode, operand);
-        (self.handler)(cpu, operand, memory);
+        (self.handler)(cpu, operand, bus);
 
         self.cycles + extra
     }
@@ -441,19 +441,19 @@ pub const INSTRUCTIONS: [Instruction; 256] = [
     Instruction { opcode: 0xFF, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true   },
 ];
 
-fn nop (_cpu: &mut Cpu, _operand: Operand, _memory: &mut Memory) {}
+fn nop (_cpu: &mut Cpu, _operand: Operand, _bus: &mut Bus) {}
 
-fn unimplemented (_cpu: &mut Cpu, _operand: Operand, _memory: &mut Memory) {
+fn unimplemented (_cpu: &mut Cpu, _operand: Operand, _bus: &mut Bus) {
     unimplemented!();
 }
 
 /**
  * Add Memory to Accumulator with Carry
  */
-fn adc (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn adc (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let value = match operand {
         Operand::Byte (byte) => byte,
-        Operand::Address (address) => memory.read(address),
+        Operand::Address (address) => bus.read(address),
         _ => panic!("Invalid addressing mode"),
     };
 
@@ -471,10 +471,10 @@ fn adc (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * AND Memory with Accumulator
  */
-fn and (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn and (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let value = match operand {
         Operand::Byte (byte) => byte,
-        Operand::Address (address) => memory.read(address),
+        Operand::Address (address) => bus.read(address),
         _ => panic!("Invalid addressing mode"),
     };
 
@@ -487,7 +487,7 @@ fn and (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Shift Left One Bit
  */
-fn asl (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn asl (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     fn lsr_inner (cpu: &mut Cpu, value: u8) -> u8 {
         let (new_value, carry) = (value << 1, value & StatusFlag::Negative as u8);
         cpu.set_flag(StatusFlag::Carry, carry != 0);
@@ -503,8 +503,8 @@ fn asl (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
             cpu.a = new_value;
         },
         Operand::Address (address) => {
-            let new_value = lsr_inner(cpu, memory.read(address));
-            memory.write(address, new_value);
+            let new_value = lsr_inner(cpu, bus.read(address));
+            bus.write(address, new_value);
         },
         _ => panic!("Invalid addressing mode"),
     };
@@ -513,7 +513,7 @@ fn asl (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Branch on Carry Set
  */
-fn bcs (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn bcs (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let address = match operand {
         Operand::Address (address) => address,
         _ => panic!("Invalid addressing mode"),
@@ -527,7 +527,7 @@ fn bcs (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Branch on Carry Clear
  */
-fn bcc (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn bcc (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let address = match operand {
         Operand::Address (address) => address,
         _ => panic!("Invalid addressing mode"),
@@ -541,7 +541,7 @@ fn bcc (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Branch on Result Zero
  */
-fn beq (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn beq (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let address = match operand {
         Operand::Address (address) => address,
         _ => panic!("Invalid addressing mode"),
@@ -555,9 +555,9 @@ fn beq (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Test Bits in Memory with Accumulator
  */
-fn bit (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn bit (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let value = match operand {
-        Operand::Address (address) => memory.read(address),
+        Operand::Address (address) => bus.read(address),
         _ => panic!("Invalid addressing mode"),
     };
 
@@ -569,7 +569,7 @@ fn bit (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Branch on Result Minus
  */
-fn bmi (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn bmi (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let address = match operand {
         Operand::Address (address) => address,
         _ => panic!("Invalid addressing mode"),
@@ -583,7 +583,7 @@ fn bmi (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Branch on Result not Zero
  */
-fn bne (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn bne (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let address = match operand {
         Operand::Address (address) => address,
         _ => panic!("Invalid addressing mode"),
@@ -597,7 +597,7 @@ fn bne (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Branch on Result Plus
  */
-fn bpl (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn bpl (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let address = match operand {
         Operand::Address (address) => address,
         _ => panic!("Invalid addressing mode"),
@@ -611,28 +611,28 @@ fn bpl (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Force Break
  */
-fn brk (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn brk (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     if operand != Operand::None {
         panic!("Invalid addressing mode");
     }
 
     let (hi, lo) = (((cpu.pc + 2) >> 8) as u8, (cpu.pc + 2) as u8);
-    cpu.push_stack(memory, hi);
-    cpu.push_stack(memory, lo);
+    cpu.push_stack(bus, hi);
+    cpu.push_stack(bus, lo);
 
     cpu.set_flag(StatusFlag::Break, true);
-    cpu.push_stack(memory, cpu.status);
+    cpu.push_stack(bus, cpu.status);
 
     cpu.set_flag(StatusFlag::Interrupt, true);
 
-    let address = (memory.read(Interrupt::IRQ as u16 + 1) as u16) << 8 | memory.read(Interrupt::IRQ as u16) as u16;
+    let address = (bus.read(Interrupt::IRQ as u16 + 1) as u16) << 8 | bus.read(Interrupt::IRQ as u16) as u16;
     cpu.pc = address;
 }
 
 /**
  * Branch on Overflow Clear
  */
-fn bvc (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn bvc (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let address = match operand {
         Operand::Address (address) => address,
         _ => panic!("Invalid addressing mode"),
@@ -646,7 +646,7 @@ fn bvc (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Branch on Overflow Set
  */
-fn bvs (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn bvs (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let address = match operand {
         Operand::Address (address) => address,
         _ => panic!("Invalid addressing mode"),
@@ -660,7 +660,7 @@ fn bvs (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Clear Carry Flag
  */
-fn clc (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn clc (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     if operand != Operand::None {
         panic!("Invalid addressing mode");
     };
@@ -671,7 +671,7 @@ fn clc (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Clear Overflow Flag
  */
-fn clv (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn clv (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     if operand != Operand::None {
         panic!("Invalid addressing mode");
     };
@@ -682,7 +682,7 @@ fn clv (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Clear Decimal Mode
  */
-fn cld (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn cld (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     if operand != Operand::None {
         panic!("Invalid addressing mode");
     };
@@ -693,10 +693,10 @@ fn cld (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Compare Memory with Accumulator
  */
-fn cmp (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn cmp (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let value = match operand {
         Operand::Byte (byte) => byte,
-        Operand::Address (address) => memory.read(address),
+        Operand::Address (address) => bus.read(address),
         _ => panic!("Invalid addressing mode"),
     };
 
@@ -708,10 +708,10 @@ fn cmp (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Compare Memory and Index X
  */
-fn cpx (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn cpx (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let value = match operand {
         Operand::Byte (byte) => byte,
-        Operand::Address (address) => memory.read(address),
+        Operand::Address (address) => bus.read(address),
         _ => panic!("Invalid addressing mode"),
     };
 
@@ -723,10 +723,10 @@ fn cpx (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Compare Memory and Index Y
  */
-fn cpy (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn cpy (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let value = match operand {
         Operand::Byte (byte) => byte,
-        Operand::Address (address) => memory.read(address),
+        Operand::Address (address) => bus.read(address),
         _ => panic!("Invalid addressing mode"),
     };
 
@@ -738,14 +738,14 @@ fn cpy (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Decrement Memory by One
  */
-fn dec (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn dec (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let address = match operand {
         Operand::Address (address) => address,
         _ => panic!("Invalid addressing mode"),
     };
 
-    let value = memory.read(address).wrapping_sub(1);
-    memory.write(address, value);
+    let value = bus.read(address).wrapping_sub(1);
+    bus.write(address, value);
 
     cpu.set_flag(StatusFlag::Zero, value == 0);
     cpu.set_flag(StatusFlag::Negative, (value as i8) < 0);
@@ -754,7 +754,7 @@ fn dec (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Decrement Index X by One
  */
-fn dex (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn dex (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let value = match operand {
         Operand::None => cpu.x,
         _ => panic!("Invalid addressing mode"),
@@ -769,7 +769,7 @@ fn dex (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Decrement Index Y by One
  */
-fn dey (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn dey (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let value = match operand {
         Operand::None => cpu.y,
         _ => panic!("Invalid addressing mode"),
@@ -784,10 +784,10 @@ fn dey (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Exclusive-OR Memory with Accumulator
  */
-fn eor (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn eor (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let value = match operand {
         Operand::Byte (byte) => byte,
-        Operand::Address (address) => memory.read(address),
+        Operand::Address (address) => bus.read(address),
         _ => panic!("Invalid addressing mode"),
     };
 
@@ -800,14 +800,14 @@ fn eor (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Increment Memory by One
  */
-fn inc (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn inc (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let address = match operand {
         Operand::Address (address) => address,
         _ => panic!("Invalid addressing mode"),
     };
 
-    let value = memory.read(address).wrapping_add(1);
-    memory.write(address, value);
+    let value = bus.read(address).wrapping_add(1);
+    bus.write(address, value);
 
     cpu.set_flag(StatusFlag::Zero, value == 0);
     cpu.set_flag(StatusFlag::Negative, (value as i8) < 0);
@@ -816,7 +816,7 @@ fn inc (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Increment Index X by One
  */
-fn inx (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn inx (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let value = match operand {
         Operand::None => cpu.x,
         _ => panic!("Invalid addressing mode"),
@@ -831,7 +831,7 @@ fn inx (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Increment Index Y by One
  */
-fn iny (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn iny (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let value = match operand {
         Operand::None => cpu.y,
         _ => panic!("Invalid addressing mode"),
@@ -846,7 +846,7 @@ fn iny (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Jump to New Location
  */
-fn jmp (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn jmp (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let address = match operand {
         Operand::Address (address) => address,
         _ => panic!("Invalid addressing mode"),
@@ -858,25 +858,25 @@ fn jmp (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Jump to New Location Saving Return Address
  */
-fn jsr (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn jsr (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let address = match operand {
         Operand::Address (address) => address,
         _ => panic!("Invalid addressing mode"),
     };
 
     let (hi, lo) = (((cpu.pc - 1) >> 8) as u8, (cpu.pc - 1) as u8);
-    cpu.push_stack(memory, hi);
-    cpu.push_stack(memory, lo);
+    cpu.push_stack(bus, hi);
+    cpu.push_stack(bus, lo);
     cpu.pc = address;
 }
 
 /**
  * Loads a byte of memory into the X register setting the zero and negative flags as appropriate.
  */
-fn ldx (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn ldx (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let value = match operand {
         Operand::Byte (byte) => byte,
-        Operand::Address (address) => memory.read(address),
+        Operand::Address (address) => bus.read(address),
         _ => panic!("Invalid addressing mode"),
     };
 
@@ -889,10 +889,10 @@ fn ldx (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Load Accumulator with Memory
  */
-fn lda (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn lda (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let value = match operand {
         Operand::Byte (byte) => byte,
-        Operand::Address (address) => memory.read(address),
+        Operand::Address (address) => bus.read(address),
         _ => panic!("Invalid addressing mode"),
     };
 
@@ -905,10 +905,10 @@ fn lda (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Load Index Y with Memory
  */
-fn ldy (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn ldy (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let value = match operand {
         Operand::Byte (byte) => byte,
-        Operand::Address (address) => memory.read(address),
+        Operand::Address (address) => bus.read(address),
         _ => panic!("Invalid addressing mode"),
     };
 
@@ -921,7 +921,7 @@ fn ldy (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Shift One Bit Right
  */
-fn lsr (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn lsr (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     fn lsr_inner (cpu: &mut Cpu, value: u8) -> u8 {
         let (new_value, carry) = (value >> 1, value & 1);
         cpu.set_flag(StatusFlag::Carry, carry != 0);
@@ -937,8 +937,8 @@ fn lsr (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
             cpu.a = new_value;
         },
         Operand::Address (address) => {
-            let new_value = lsr_inner(cpu, memory.read(address));
-            memory.write(address, new_value);
+            let new_value = lsr_inner(cpu, bus.read(address));
+            bus.write(address, new_value);
         },
         _ => panic!("Invalid addressing mode"),
     };
@@ -947,10 +947,10 @@ fn lsr (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * OR Memory with Accumulator
  */
-fn ora (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn ora (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let value = match operand {
         Operand::Byte (byte) => byte,
-        Operand::Address (address) => memory.read(address),
+        Operand::Address (address) => bus.read(address),
         _ => panic!("Invalid addressing mode"),
     };
 
@@ -963,33 +963,33 @@ fn ora (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Push Accumulator on Stack
  */
-fn pha (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn pha (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let value = match operand {
         Operand::None => cpu.a,
         _ => panic!("Invalid addressing mode"),
     };
 
-    cpu.push_stack(memory, value);
+    cpu.push_stack(bus, value);
 }
 
 /**
  * Push Processor Status on Stack
  */
-fn php (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn php (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let status = match operand {
         Operand::None => cpu.status,
         _ => panic!("Invalid addressing mode"),
     };
 
-    cpu.push_stack(memory, status | (StatusFlag::Break as u8) | (StatusFlag::Unused as u8));
+    cpu.push_stack(bus, status | (StatusFlag::Break as u8) | (StatusFlag::Unused as u8));
 }
 
 /**
  * Pull Accumulator from Stack
  */
-fn pla (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn pla (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let value = match operand {
-        Operand::None => cpu.pop_stack(memory),
+        Operand::None => cpu.pop_stack(bus),
         _ => panic!("Invalid addressing mode"),
     };
 
@@ -1002,9 +1002,9 @@ fn pla (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Pull Processor Status from Stack
  */
-fn plp (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn plp (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let status = match operand {
-        Operand::None => cpu.pop_stack(memory),
+        Operand::None => cpu.pop_stack(bus),
         _ => panic!("Invalid addressing mode"),
     };
 
@@ -1016,7 +1016,7 @@ fn plp (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Rotate One Bit Left
  */
-fn rol (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn rol (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     fn ror_inner (cpu: &mut Cpu, value: u8) -> u8 {
         let (new_value, carry) = (value << 1 | cpu.status & StatusFlag::Carry as u8, value & StatusFlag::Negative as u8);
         cpu.set_flag(StatusFlag::Carry, carry != 0);
@@ -1032,8 +1032,8 @@ fn rol (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
             cpu.a = new_value;
         },
         Operand::Address (address) => {
-            let new_value = ror_inner(cpu, memory.read(address));
-            memory.write(address, new_value);
+            let new_value = ror_inner(cpu, bus.read(address));
+            bus.write(address, new_value);
         },
         _ => panic!("Invalid addressing mode"),
     };
@@ -1042,7 +1042,7 @@ fn rol (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Rotate One Bit Right
  */
-fn ror (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn ror (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     fn ror_inner (cpu: &mut Cpu, value: u8) -> u8 {
         let (new_value, carry) = (value >> 1 | (cpu.status & StatusFlag::Carry as u8) << 7, value & 1);
         cpu.set_flag(StatusFlag::Carry, carry != 0);
@@ -1058,8 +1058,8 @@ fn ror (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
             cpu.a = new_value;
         },
         Operand::Address (address) => {
-            let new_value = ror_inner(cpu, memory.read(address));
-            memory.write(address, new_value);
+            let new_value = ror_inner(cpu, bus.read(address));
+            bus.write(address, new_value);
         },
         _ => panic!("Invalid addressing mode"),
     };
@@ -1068,15 +1068,15 @@ fn ror (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Return from Interrupt
  */
-fn rti (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn rti (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     if operand != Operand::None {
         panic!("Invalid addressing mode");
     };
 
     // Ignored flags
     let mask = (StatusFlag::Break as u8) | (StatusFlag::Unused as u8);
-    let status = cpu.pop_stack(memory);
-    let (lo, hi) = (cpu.pop_stack(memory), cpu.pop_stack(memory));
+    let status = cpu.pop_stack(bus);
+    let (lo, hi) = (cpu.pop_stack(bus), cpu.pop_stack(bus));
     let address = (hi as u16) << 8 | lo as u16;
     
     cpu.status = (status & !mask) | (cpu.status & mask);
@@ -1086,12 +1086,12 @@ fn rti (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Return from Subroutine
  */
-fn rts (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn rts (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     if operand != Operand::None {
         panic!("Invalid addressing mode");
     };
 
-    let (lo, hi) = (cpu.pop_stack(memory), cpu.pop_stack(memory));
+    let (lo, hi) = (cpu.pop_stack(bus), cpu.pop_stack(bus));
     let address = (hi as u16) << 8 | lo as u16;
 
     cpu.pc = address + 1;
@@ -1100,20 +1100,20 @@ fn rts (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
 /**
  * Subtract Memory from Accumulator with Borrow
  */
-fn sbc (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn sbc (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let value = match operand {
         Operand::Byte (byte) => byte,
-        Operand::Address (address) => memory.read(address),
+        Operand::Address (address) => bus.read(address),
         _ => panic!("Invalid addressing mode"),
     };
 
-    adc(cpu, Operand::Byte(!value), memory);
+    adc(cpu, Operand::Byte(!value), bus);
 }
 
 /**
  * Set Carry Flag
  */
-fn sec (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn sec (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     if operand != Operand::None {
         panic!("Invalid addressing mode");
     };
@@ -1124,7 +1124,7 @@ fn sec (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Set Decimal Flag
  */
-fn sed (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn sed (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     if operand != Operand::None {
         panic!("Invalid addressing mode");
     };
@@ -1135,7 +1135,7 @@ fn sed (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Set Interrupt Disable Status
  */
-fn sei (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn sei (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     if operand != Operand::None {
         panic!("Invalid addressing mode");
     };
@@ -1146,43 +1146,43 @@ fn sei (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Store Accumulator in Memory
  */
-fn sta (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn sta (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let address = match operand {
         Operand::Address (address) => address,
         _ => panic!("Invalid addressing mode"),
     };
 
-    memory.write(address, cpu.a);
+    bus.write(address, cpu.a);
 }
 
 /**
  * Store Index X in Memory
  */
-fn stx (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn stx (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let address = match operand {
         Operand::Address (address) => address,
         _ => panic!("Invalid addressing mode"),
     };
 
-    memory.write(address, cpu.x);
+    bus.write(address, cpu.x);
 }
 
 /**
  * Store Index Y in Memory
  */
-fn sty (cpu: &mut Cpu, operand: Operand, memory: &mut Memory) {
+fn sty (cpu: &mut Cpu, operand: Operand, bus: &mut Bus) {
     let address = match operand {
         Operand::Address (address) => address,
         _ => panic!("Invalid addressing mode"),
     };
 
-    memory.write(address, cpu.y);
+    bus.write(address, cpu.y);
 }
 
 /**
  * Transfer Accumulator to Index X
  */
-fn tax (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn tax (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let value = match operand {
         Operand::None => cpu.a,
         _ => panic!("Invalid addressing mode"),
@@ -1197,7 +1197,7 @@ fn tax (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Transfer Accumulator to Index Y
  */
-fn tay (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn tay (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let value = match operand {
         Operand::None => cpu.a,
         _ => panic!("Invalid addressing mode"),
@@ -1212,7 +1212,7 @@ fn tay (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Transfer Stack Pointer to Index X
  */
-fn tsx (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn tsx (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let value = match operand {
         Operand::None => cpu.sp,
         _ => panic!("Invalid addressing mode"),
@@ -1227,7 +1227,7 @@ fn tsx (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Transfer Index X to Accumulator
  */
-fn txa (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn txa (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let value = match operand {
         Operand::None => cpu.x,
         _ => panic!("Invalid addressing mode"),
@@ -1242,7 +1242,7 @@ fn txa (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Transfer Index X to Stack Pointer
  */
-fn txs (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn txs (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let value = match operand {
         Operand::None => cpu.x,
         _ => panic!("Invalid addressing mode"),
@@ -1254,7 +1254,7 @@ fn txs (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 /**
  * Transfer Index Y to Accumulator
  */
-fn tya (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
+fn tya (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     let value = match operand {
         Operand::None => cpu.y,
         _ => panic!("Invalid addressing mode"),
@@ -1264,11 +1264,4 @@ fn tya (cpu: &mut Cpu, operand: Operand, _memory: &mut Memory) {
 
     cpu.set_flag(StatusFlag::Zero, cpu.a == 0);
     cpu.set_flag(StatusFlag::Negative, (cpu.a as i8) < 0);
-}
-
-pub fn coverage () -> (usize, usize) {
-    let legal = INSTRUCTIONS.iter().filter(|ins| !ins.illegal).count();
-    let implemented = INSTRUCTIONS.iter().filter(|ins| !ins.illegal && ins.handler as usize != unimplemented as usize).count();
-
-    (legal, implemented)
 }

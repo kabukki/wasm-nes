@@ -35,6 +35,7 @@ cl65 roms/test.s -C roms/test.cfg -o roms/test.bin
 - http://wiki.nesdev.com
 - http://nesdev.com/NESDoc.pdf
 - https://en.wikipedia.org/wiki/MOS_Technology_6502
+- https://www.copetti.org/writings/consoles/nes
 
 #### Opcodes
 
@@ -49,6 +50,8 @@ cl65 roms/test.s -C roms/test.cfg -o roms/test.bin
 - https://github.com/GarettCooper/emulator_6502
 - https://github.com/GarettCooper/gc_nes_emulator
 - https://github.com/daniel5151/ANESE
+- https://famicom.party/book
+- https://bugzmanov.github.io/nes_ebook
 
 ### ROMs & Tests
 

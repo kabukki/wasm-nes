@@ -1,15 +1,17 @@
+// https://wiki.nesdev.com/w/index.php/CPU_interrupts
+
 pub const INTERRUPT_LATENCY: u8 = 7;
 
 pub enum Interrupt {
     /**
-     * Maskable interrupt
-     */
-    IRQ = 0xFFFE,
-
-    /**
      * Non-maskable interrupt
      */
     NMI = 0xFFFA,
+
+    /**
+     * Maskable interrupt
+     */
+    IRQ = 0xFFFE,
 
     /**
      * System reset

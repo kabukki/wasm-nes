@@ -1,56 +1,56 @@
-/*
-    The NES's master clock frequency is 21.477272 Mhz.
-    The CPU divides it by 12, hence runs at 1.7897727 Mhz.
-    The PPU divides it by 4, hence runs at 5.369318 Mhz (3x CPU).
-    The APU divides it by 89490, hence runs at 239.996335 Hz.
-    Since 12 / 4 = 3 there are 3 PPU clocks per 1 CPU clock.
-    Since 89490 / 12 = 7457.5 there are 7457.5 CPU clocks per 1 APU clock.
-*/
+extern crate console_error_panic_hook;
 
-use crate::cpu::cpu::Cpu;
-use crate::cpu::memory::{Memory, MEMORY_CARTRIDGE_PRG_LOWER_START, MEMORY_CARTRIDGE_PRG_UPPER_START, CARTRIDGE_BANK_SIZE};
-use crate::ppu::ppu::Ppu;
+use wasm_bindgen::prelude::*;
+use crate::bus::Bus;
+use crate::cpu::Cpu;
+use crate::cartridge::Cartridge;
 
-pub mod cpu {
-    pub mod cpu;
-    pub mod instruction;
-    pub mod interrupt;
-    pub mod memory;
+pub mod cpu;
+pub mod ppu;
+pub mod cartridge;
+pub mod bus;
+
+trait MemoryMap {
+    fn read (&self, a: u16) -> u8;
+    // pub fn write (a: u16) -> u8 {}
 }
 
-pub mod ppu {
-    pub mod ppu;
-}
-
+#[wasm_bindgen]
 pub struct Nes {
-    pub cpu: Cpu,
-    pub ppu: Ppu,
-    pub memory: Memory,
+    cpu: Cpu,
+    bus: Bus,
+    cycles: usize,
 }
 
+#[wasm_bindgen]
 impl Nes {
     pub fn new () -> Nes {
         return Nes {
             cpu: Cpu::new(),
-            ppu: Ppu::new(),
-            memory: Memory::new(),
+            bus: Bus::new(),
+            cycles: 0,
         };
     }
 
     /**
      * Load a ROM
      */
-    pub fn load (&mut self, rom: Vec<u8>) {
-        // Copy 0x4000 bytes into upper & lower ROM PRG (write twice while we don't have a mapper)
-        for n in 0..CARTRIDGE_BANK_SIZE {
-            self.memory.write(MEMORY_CARTRIDGE_PRG_LOWER_START + n as u16, rom[n + 0x10]);
-            self.memory.write(MEMORY_CARTRIDGE_PRG_UPPER_START + n as u16, rom[n + 0x10]);
-        }
-
-        self.cpu.pc = MEMORY_CARTRIDGE_PRG_UPPER_START;
+    pub fn load (&mut self, rom: &[u8]) {
+        self.bus.cartridge = Some(Cartridge::new(rom));
+        self.cpu.reset(&self.bus);
     }
 
     pub fn cycle (&mut self) {
-        self.cpu.cycle(&mut self.memory);
+        // 1/3
+        if self.cycles % 3 == 0 {
+            self.cpu.cycle(&mut self.bus);
+        }
+        self.bus.ppu.cycle(&self.bus);
+        self.cycles += 1;
     }
+}
+
+#[wasm_bindgen]
+pub fn set_panic_hook () {
+    console_error_panic_hook::set_once();
 }

@@ -8,9 +8,6 @@
     - CPU based on MOS 6502
     - Pseudo-**Audio Processing Unit** capabilities
     - 3 general-purpose registers
-    - Memory
-        - RAM
-        - I/O registers
     - Little-endian
     - 16-bit address bus
 - **Pixel Processing Unit**: Ricoh 2C02
@@ -20,12 +17,40 @@ Cartridge ROM is accessed by the CPU through a **Memory Management Controller** 
 
 ## Development
 
+### Toolchain
+
+The emulator is written in Rust and compiled into a WebAssembly module through wasm-pack and uses wasm-bindgen to ease interoperability with the JavaScript environment. A custom JavaScript file wraps the produced package for convenience when consuming it in JavaScript.
+
+```
+.rs ---[wasm-pack]---> .wasm <--> JS wrapper <--- JS
+```
+
+The emitted JS wrapper is distributed as an ES Module.
+
 ### Compiling a test program
 
 You'll need a 6502 assembler & linker such as [cc65](https://github.com/cc65/cc65).
 
 ```bash
 cl65 roms/test.s -C roms/test.cfg -o roms/test.bin
+```
+
+## Usage
+
+Before creating the emulator, you need to call the `init` function which will correctly instantiate and setup the WebAssembly module.
+
+```js
+import init, { Emulator } from '@kabukki/wasm-nes';
+
+init().then(() => {
+    const emulator = new Emulator();
+
+    document.getElementById('input').addEventListener('change', async (e) => {
+        const buffer = await e.target.files[0]?.arrayBuffer();
+        emulator.load(new Uint8Array(buffer));
+        emulator.start();
+    });
+}).catch(console.error);
 ```
 
 ## Resources

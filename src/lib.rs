@@ -24,12 +24,12 @@ pub struct Nes {
 
 #[wasm_bindgen]
 impl Nes {
-    pub fn new () -> Nes {
-        return Nes {
+    pub fn new () -> Self {
+        Nes {
             cpu: Cpu::new(),
             bus: Bus::new(),
             cycles: 0,
-        };
+        }
     }
 
     /**
@@ -47,6 +47,12 @@ impl Nes {
         }
         self.bus.ppu.cycle(&self.bus);
         self.cycles += 1;
+    }
+}
+
+impl Default for Nes {
+    fn default () -> Self {
+        Nes::new()
     }
 }
 

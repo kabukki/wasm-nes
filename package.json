@@ -9,6 +9,7 @@
     "build:wasm": "wasm-pack build -t web --debug --scope kabukki --out-name index",
     "build:js": "rollup -c && tsc --emitDeclarationOnly",
     "build": "npm run build:wasm && npm run build:js",
+    "lint": "cargo clippy",
     "prepack": "npm run build"
   },
   "devDependencies": {

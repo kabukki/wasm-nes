@@ -59,14 +59,14 @@ pub struct Ppu {
     pub vram: [u8; 0x2000], // Nametables. 2x1KiB (2 screen states)
     pub dot: u16,
     pub scanline: u16,
-    framebuffer: [u8; 256 * 240], // 512x480 -> 256x240
+    // framebuffer: [u8; 256 * 240], // 512x480 -> 256x240
     
     // Background
     pub address: u16,
-    pattern_shift_hi: u16,
-    pattern_shift_lo: u16,
-    palette_shift_hi: u8,
-    palette_shift_lo: u8,
+    // pattern_shift_hi: u16,
+    // pattern_shift_lo: u16,
+    // palette_shift_hi: u8,
+    // palette_shift_lo: u8,
 
     // Sprites
     pub oam: [u8; 256], // Sprite RAM: 64 * 4 bytes (Y, tile #, attribute, X)
@@ -74,7 +74,7 @@ pub struct Ppu {
 
 impl Ppu {
     pub fn new () -> Ppu {
-        return Ppu {
+        Ppu {
             ctrl: 0,
             mask: 0,
             status: 0,
@@ -87,24 +87,24 @@ impl Ppu {
             oam: [0; 256],
             dot: 0,
             scanline: 0,
-            framebuffer: [0; 256 * 240],
+            // framebuffer: [0; 256 * 240],
             address: 0,
-            pattern_shift_hi: 0,
-            pattern_shift_lo: 0,
-            palette_shift_hi: 0,
-            palette_shift_lo: 0,        
-        };
+            // pattern_shift_hi: 0,
+            // pattern_shift_lo: 0,
+            // palette_shift_hi: 0,
+            // palette_shift_lo: 0,        
+        }
     }
 
-    pub fn cycle (&self, bus: &Bus) {
+    pub fn cycle (&self, _bus: &Bus) {
         match self.scanline {
             0 ..= 239 => {
                 // PPU busy fetching data, so PPU memory should not be accessed during this time (unless rendering is turned off - MaskFlags)
                 match self.dot {
                     0 => {}, // Idle
                     1 ..= 256 => {
-                        let offset = (self.ctrl & CtrlFlag::Nametable as u8) as u16 * 0x400;
-                        let tile = self.read(bus, self.address + offset);
+                        // let offset = (self.ctrl & CtrlFlag::Nametable as u8) as u16 * 0x400;
+                        // let tile = self.read(bus, self.address + offset);
                         //  bus.cartridge.unwrap().
                         // vert(v) inc.
                     },
@@ -177,7 +177,7 @@ impl Ppu {
         }
     }
 
-    pub fn write (&mut self, bus: &mut Bus, address: u16, data: u8) {
+    pub fn write (&mut self, _bus: &mut Bus, _address: u16, _data: u8) {
 
     }
 
@@ -186,4 +186,10 @@ impl Ppu {
     // }
 
     // pub fn write_address () {}
+}
+
+impl Default for Ppu {
+    fn default () -> Self {
+        Ppu::new()
+    }
 }

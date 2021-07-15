@@ -155,7 +155,6 @@ impl Instruction {
                 cpu.pc += 1;
                 Operand::Address(address.wrapping_add(cpu.y as u16))
             },
-            _ => Operand::None,
         };
         let extra = 0; // TODO extra cycles based on policy: page boundary, branching... returned along operand
 

@@ -63,7 +63,7 @@ impl Bus {
                 }
             },
             MEMORY_CARTRIDGE_START ..= MEMORY_CARTRIDGE_END => self.cartridge.as_ref().unwrap().read_prg((address - MEMORY_CARTRIDGE_START as u16) % 0x4000), // should be handled by mapper if 1 or 2 banks
-            _ => unimplemented!(),
+            // _ => unimplemented!(),
             // MEMORY_SRAM_START ..= MEMORY_SRAM_END => self.wram[usize::from(address - MEMORY_SRAM_START)],
             // MEMORY_ROM_START ..= MEMORY_ROM_END => self.wram[usize::from(address - MEMORY_ROM_START)],
         }
@@ -90,5 +90,11 @@ impl Bus {
             // MEMORY_SRAM_START ..= MEMORY_SRAM_END => self.wram[usize::from(address - MEMORY_SRAM_START)],
             // MEMORY_ROM_START ..= MEMORY_ROM_END => self.wram[usize::from(address - MEMORY_ROM_START)],
         };
+    }
+}
+
+impl Default for Bus {
+    fn default () -> Self {
+        Bus::new()
     }
 }

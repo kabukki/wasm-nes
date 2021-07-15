@@ -33,17 +33,17 @@ pub enum Mirroring {
 
 #[wasm_bindgen]
 pub struct Cartridge {
-    sram: [u8; 2048],
+    // sram: [u8; 2048],
     prg_rom: Vec<u8>,
     chr_rom: Vec<u8>,
-    ram: Vec<u8>,
+    // ram: Vec<u8>,
     mirroring: Mirroring,
     // pub mapper: dyn Mapper
 }
 
 #[wasm_bindgen]
 impl Cartridge {
-    pub fn new (rom: &[u8]) -> Cartridge {
+    pub fn new (rom: &[u8]) -> Self {
         let mut cursor = Cursor::new(rom);
         let mut header = [0u8; 16];
         cursor.read_exact(&mut header).expect("Could not read header");
@@ -71,10 +71,10 @@ impl Cartridge {
 
         // check header
         let mut cartridge = Cartridge {
-            sram: [0; 2048],
+            // sram: [0; 2048],
             prg_rom: vec![0; prg_rom_banks * PRG_ROM_BANK_SIZE],
             chr_rom: vec![0; chr_rom_banks * CHR_ROM_BANK_SIZE],
-            ram: vec![0; ram * RAM_BANK_SIZE],
+            // ram: vec![0; ram * RAM_BANK_SIZE],
             mirroring,
         };
 
@@ -133,7 +133,7 @@ impl Cartridge {
     }
     
     // Mapper
-    pub fn read (&self, address: u16) -> u8 {
+    pub fn read (&self, _address: u16) -> u8 {
         0
     }
 

@@ -58,7 +58,7 @@ pub struct Cpu {
 
 impl Cpu {
     pub fn new () -> Cpu {
-        return Cpu {
+        Cpu {
             pc: 0,
             sp: 0xFD, // nestest
             a: 0,
@@ -66,7 +66,7 @@ impl Cpu {
             y: 0,
             status: 0b00100100,
             cycles: 0,
-        };
+        }
     }
 
     pub fn reset (&mut self, bus: &Bus) {
@@ -108,5 +108,11 @@ impl std::fmt::Debug for Cpu {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // write!(f, "PC = {:#x}, A = {}, X = {}, Y = {}, Status = {:#010b}", self.pc, self.a, self.x, self.y, self.status)
         write!(f, "{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{}", self.pc, self.a, self.x, self.y, self.status, self.sp, self.cycles)
+    }
+}
+
+impl Default for Cpu {
+    fn default () -> Self {
+        Cpu::new()
     }
 }

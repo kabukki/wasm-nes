@@ -8,5 +8,7 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
+log = "0.4"
 wasm-bindgen = "0.2.74"
 console_error_panic_hook = "0.1.6"
+console_log = { version = "0.2", features = ["color"] }

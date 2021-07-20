@@ -1,3 +1,4 @@
+use log::debug;
 use crate::ppu::Ppu;
 use crate::cartridge::Cartridge;
 
@@ -54,7 +55,7 @@ impl Bus {
         match address {
             MEMORY_RAM_START ..= MEMORY_RAM_END => self.wram[usize::from(address - MEMORY_RAM_START) % 0x0800],
             a @ MEMORY_IO_START ..= MEMORY_IO_END => {
-                // println!("I/O READ");
+                debug!("I/O READ");
                 match a % 8 + 0x2000 {
                     0x2002 => self.ppu.status,
                     0x2004 => self.ppu.oam_data,
@@ -62,8 +63,8 @@ impl Bus {
                     _ => panic!("Invalid I/O read"),
                 }
             },
-            MEMORY_CARTRIDGE_START ..= MEMORY_CARTRIDGE_END => self.cartridge.as_ref().unwrap().read_prg((address - MEMORY_CARTRIDGE_START as u16) % 0x4000), // should be handled by mapper if 1 or 2 banks
-            // _ => unimplemented!(),
+            MEMORY_CARTRIDGE_PRG_START ..= MEMORY_CARTRIDGE_END => self.cartridge.as_ref().unwrap().read_prg((address - MEMORY_CARTRIDGE_PRG_START as u16) % 0x4000), // should be handled by mapper if 1 or 2 banks
+            _ => unimplemented!(),
             // MEMORY_SRAM_START ..= MEMORY_SRAM_END => self.wram[usize::from(address - MEMORY_SRAM_START)],
             // MEMORY_ROM_START ..= MEMORY_ROM_END => self.wram[usize::from(address - MEMORY_ROM_START)],
         }
@@ -73,7 +74,7 @@ impl Bus {
         match address {
             MEMORY_RAM_START ..= MEMORY_RAM_END => self.wram[usize::from(address - MEMORY_RAM_START) % 0x0800] = data,
             a @ MEMORY_IO_START ..= MEMORY_IO_END => {
-                // println!("I/O WRITE");
+                debug!("I/O WRITE");
                 match a % 8 + 0x2000 {
                     0x2000 => { self.ppu.ctrl = data; },
                     0x2001 => { self.ppu.mask = data; },

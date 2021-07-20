@@ -1,4 +1,4 @@
-import init, { Nes, set_panic_hook } from './pkg';
+import init, { Nes, set_panic_hook, set_log } from './pkg';
 
 /**
  * The NES's master clock frequency is 21.477272 Mhz.
@@ -47,7 +47,7 @@ export class Emulator {
 }
 
 export default function () {
-    return init().then(set_panic_hook);
+    return init().then(set_panic_hook).then(set_log);
 }
 
 export { Cartridge } from './pkg';

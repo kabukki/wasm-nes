@@ -1,3 +1,4 @@
+use log::trace;
 use crate::bus::Bus;
 use crate::cpu::{Cpu, StatusFlag};
 use crate::cpu::interrupt::Interrupt;
@@ -78,12 +79,12 @@ impl std::fmt::Display for Operand {
 }
 
 pub struct Instruction {
-    pub opcode: u8,
-    pub name: &'static str,
-    pub mode: AddressingMode,
-    pub cycles: u8,
-    pub handler: InstructionHandler,
-    pub illegal: bool,
+    opcode: u8,
+    name: &'static str,
+    mode: AddressingMode,
+    cycles: u8,
+    handler: InstructionHandler,
+    illegal: bool,
 }
 
 impl Instruction {
@@ -159,7 +160,7 @@ impl Instruction {
         let extra = 0; // TODO extra cycles based on policy: page boundary, branching... returned along operand
 
         // log (operand, self.mode)
-        println!("  {:02X} [{} {:#?}] {}", self.opcode, self.name, self.mode, operand);
+        trace!("{:02X} [{} {:#?}] {}", self.opcode, self.name, self.mode, operand);
         (self.handler)(cpu, operand, bus);
 
         self.cycles + extra

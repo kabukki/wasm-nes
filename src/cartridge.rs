@@ -1,4 +1,5 @@
 use wasm_bindgen::prelude::*;
+use log::{debug, trace};
 use std::io::prelude::*;
 use std::io::Cursor;
 use crate::ppu::palette::BACKGROUND_PALETTE;
@@ -63,13 +64,8 @@ impl Cartridge {
             (false, true) => Mirroring::Horizontal,
         };
 
-        println!("PRG-ROM banks: {}", prg_rom_banks);
-        println!("CHR-ROM banks: {}", chr_rom_banks);
-        println!("Mapper: {}", mapper);
-        println!("RAM size: {}", ram);
-        println!("Has trainer ? {}", trainer);
+        debug!("PRG-ROM banks: {}\nCHR-ROM banks: {}\nMapper: {}\nRAM size: {}\nHas trainer ? {}", chr_rom_banks, prg_rom_banks, mapper, ram, trainer);
 
-        // check header
         let mut cartridge = Cartridge {
             // sram: [0; 2048],
             prg_rom: vec![0; prg_rom_banks * PRG_ROM_BANK_SIZE],
@@ -138,10 +134,12 @@ impl Cartridge {
     }
 
     pub fn read_chr (&self, address: u16) -> u8 {
+        trace!("Read CHR @ {:#x} -> {:#x}", address, self.chr_rom[address as usize]);
         self.chr_rom[address as usize]
     }
 
     pub fn read_prg (&self, address: u16) -> u8 {
+        trace!("Read PRG @ {:#x} -> {:#x}", address, self.prg_rom[address as usize]);
         self.prg_rom[address as usize]
     }
 }

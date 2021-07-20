@@ -7,17 +7,13 @@
   ],
   "scripts": {
     "build:wasm": "wasm-pack build -t web --debug --scope kabukki --out-name index",
-    "build:js": "rollup -c && tsc --emitDeclarationOnly",
+    "build:js": "esbuild --bundle --outdir=dist --sourcemap --format=esm index.ts && tsc --emitDeclarationOnly && cp pkg/*.wasm dist",
     "build": "npm run build:wasm && npm run build:js",
     "lint": "cargo clippy",
     "prepack": "npm run build"
   },
   "devDependencies": {
-    "@rollup/plugin-node-resolve": "^13.0.0",
-    "@rollup/plugin-typescript": "^8.2.1",
-    "rollup": "^2.52.2",
-    "rollup-plugin-copy": "^3.4.0",
-    "tslib": "^2.3.0",
+    "esbuild": "^0.12.15",
     "typescript": "^4.3.5"
   }
 }

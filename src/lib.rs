@@ -79,41 +79,31 @@ impl Nes {
     /**
      * https://wiki.nesdev.com/w/index.php/PPU_attribute_tables
      */
-    pub fn get_nametable (&self, nth: u16) -> Clamped<Vec<u8>> {
+    pub fn get_nametable (&mut self, nth: u16) -> Clamped<Vec<u8>> {
         let cartridge = self.bus.cartridge.as_ref().unwrap();
         let start_address = self.bus.ppu.mirror(cartridge, 0x2000 + nth * 0x400);
         let mut map = Tilemap::new(32, 30);
 
         for n in 0 .. 960 {
-            let x = n % 32;
-            let y = n / 32;
+            let (x, y) = (n % 32, n / 32);
 
             // Get tile
-            let index = self.bus.ppu.read_vram(cartridge, start_address + n) as usize;
+            let address = start_address + n;
+            let index = self.bus.ppu.read_vram(cartridge, address) as usize;
             let tile = cartridge.get_tile(index + if (self.bus.ppu.ctrl & CtrlFlag::Background as u8) > 0 { 256 } else { 0 });
 
-            // Get byte from attribute table
-            // let byte = self.bus.ppu.read(&self.bus.cartridge.as_ref().unwrap(), 0x23C0 | (addr & 0xC00) | ((addr >> 4) & 0x38) | ((addr >> 2) & 0x07));
-            // let byte = self.bus.ppu.nametables[(nth as usize * 960) + (n as usize / 4)];
+            // Get byte from attribute table. See https://github.com/OneLoneCoder/olcNES/blob/master/Part%20%234%20-%20PPU%20Backgrounds/olc2C02.cpp#L802
+            let byte = self.bus.ppu.read_vram(cartridge, start_address + 960 + (x / 4) + (y / 4) * 8);
 
-            // let (topleft, topright, bottomleft, bottomright) = (
-            //     byte & 0b11,
-            //     (byte >> 2) & 0b11,
-            //     (byte >> 4) & 0b11,
-            //     (byte >> 6) & 0b11,
-            // );
-            
             // Get palette
-            // let quadrant = match (x % 2, y % 2) {
-            //     (0, 0) => topleft,
-            //     (1, 0) => topright,
-            //     (0, 1) => bottomleft,
-            //     (1, 1) => bottomright,
-            //     _ => panic!("Not possible"),
-            // };
-
-            // let palette = &self.bus.ppu.palettes[4 * quadrant as usize .. 4 * quadrant as usize + 4];
-            let palette = &self.bus.ppu.palettes[..4]; // Use first palette
+            let number = match (x % 4 / 2, y % 4 / 2) {
+                (0, 0) => (byte >> 0) & 0b11, // Top left
+                (1, 0) => (byte >> 2) & 0b11, // Top right
+                (0, 1) => (byte >> 4) & 0b11, // Bottom left
+                (1, 1) => (byte >> 6) & 0b11, // Bottom right
+                _ => panic!("Not possible"),
+            };
+            let palette = &self.bus.ppu.palettes[4 * number as usize .. 4 * number as usize + 4];
 
             // Draw tile
             map.write_tile(x as usize, y as usize, tile.as_slice(), palette);

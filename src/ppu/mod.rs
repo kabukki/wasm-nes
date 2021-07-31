@@ -240,7 +240,7 @@ impl Ppu {
 
                 dummy
             },
-            _ => panic!("Invalid I/O read"),
+            _ => panic!("Invalid I/O read @ {:#x}", address),
         }
     }
 
@@ -287,7 +287,7 @@ impl Ppu {
                 self.write_vram(cartridge, self.address, data);
                 self.address += if (self.ctrl & CtrlFlag::Increment as u8) > 0 { 32 } else { 1 };
             },
-            _ => panic!("Invalid I/O write"),
+            _ => panic!("Invalid I/O write @ {:#x}", address),
         }
     }
 
@@ -309,7 +309,7 @@ impl Ppu {
             // Palette
             0x3F00 ..= 0x3FFF => self.palettes[(address as usize - 0x3F00) % 0x20],
             // 0x4000 ..= 0xFFFF => self.read(nes, address - 0x4000),
-            _ => panic!("Invalid address"),
+            _ => panic!("Invalid read @ {:#x}", address),
         }
     }
 
@@ -328,7 +328,7 @@ impl Ppu {
                 // info!("Write Palette {:#x} <- {:#x}", address, data);
                 self.palettes[(address as usize - 0x3F00) % 0x20] = data;
             },
-            _ => panic!("Invalid address {:x}", address),
+            _ => panic!("Invalid write @ {:#x}", address),
         }
     }
 

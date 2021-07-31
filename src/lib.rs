@@ -1,46 +1,17 @@
 extern crate console_error_panic_hook;
 
-use wasm_bindgen::prelude::*;
-use log::debug;
+use wasm_bindgen::{prelude::*, Clamped};
+use log::{info, trace};
 use crate::bus::Bus;
 use crate::cpu::Cpu;
-use crate::cartridge::Cartridge;
+use crate::ppu::CtrlFlag;
+use crate::tilemap::Tilemap;
 
 pub mod cpu;
 pub mod ppu;
 pub mod cartridge;
 pub mod bus;
-
-/**
- * CPU state representation
- */
-#[derive(PartialEq)]
-pub struct State {
-    pub pc: u16,
-    pub a: u8,
-    pub x: u8,
-    pub y: u8,
-    pub status: u8,
-    pub sp: u8,
-}
-
-impl State {
-    pub fn from_str (string: &String) -> State {
-        let pc = &string[..4];
-        let registers = &string[48..73];
-        let (a, x, y, status, sp) = (&registers[2..4], &registers[7..9], &registers[12..14], &registers[17..19], &registers[23..25]);
-
-        State {
-            pc: u16::from_str_radix(pc, 16).unwrap(),
-            a: u8::from_str_radix(a, 16).unwrap(),
-            x: u8::from_str_radix(x, 16).unwrap(),
-            y: u8::from_str_radix(y, 16).unwrap(),
-            status: u8::from_str_radix(status, 16).unwrap(),
-            sp: u8::from_str_radix(sp, 16).unwrap(),
-        }
-    }
-    // pub fn to_str
-}
+pub mod tilemap;
 
 // trait MemoryMap {
 //     fn read (&self, a: u16) -> u8;
@@ -67,20 +38,152 @@ impl Nes {
     /**
      * Load a ROM
      */
-    pub fn load (&mut self, rom: &[u8]) {
-        self.bus.cartridge = Some(Cartridge::new(rom));
-        self.cpu.reset(&self.bus);
+    pub fn load (&mut self, rom: Vec<u8>) {
+        self.bus.load(&rom);
+        self.cpu.reset();
     }
 
-    pub fn cycle (&mut self) {
-        // 1/3
-        if self.cycles % 3 == 0 {
-            debug!("PC:{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:08b} SP:{:02X}", self.cpu.pc, self.cpu.a, self.cpu.x, self.cpu.y, self.cpu.status, self.cpu.sp);
-            self.cpu.cycle(&mut self.bus);
+    pub fn cycle (&mut self) -> usize {
+        let frame = self.bus.ppu.frame;
+
+        // Cycle until frame is rendered
+        while frame == self.bus.ppu.frame {
+            if self.cycles % 3 == 0 {
+                self.cpu.cycle(&mut self.bus);
+            }
+            self.bus.ppu.cycle(&self.bus.cartridge.as_ref().unwrap(), &mut self.cpu);
+            // info!("Scanline {}, Dot {}", self.bus.ppu.scanline, self.bus.ppu.dot);
+            self.cycles += 1;
         }
-        self.bus.ppu.cycle(&self.bus);
-        self.cycles += 1;
+
+        frame + 1
     }
+
+    pub fn get_framebuffer (&self) -> Clamped<Vec<u8>> {
+        // let buffer32 = &self.bus.ppu.framebuffer;
+        // let mut buffer8: Vec<u8> = Vec::with_capacity(buffer32.len() * 4);
+        
+        // for n in buffer32.iter() {
+        //     buffer8.extend_from_slice(&n.to_be_bytes());
+        // }
+
+        // Clamped(buffer8)
+
+        Clamped(
+            unsafe {
+                self.bus.ppu.framebuffer.align_to::<u8>().1.to_vec()
+            }
+        )
+    }
+
+    /**
+     * https://wiki.nesdev.com/w/index.php/PPU_attribute_tables
+     */
+    pub fn get_nametable (&self, nth: u16) -> Clamped<Vec<u8>> {
+        let cartridge = self.bus.cartridge.as_ref().unwrap();
+        let start_address = self.bus.ppu.mirror(cartridge, 0x2000 + nth * 0x400);
+        let mut map = Tilemap::new(32, 30);
+
+        for n in 0 .. 960 {
+            let x = n % 32;
+            let y = n / 32;
+
+            // Get tile
+            let index = self.bus.ppu.read_vram(cartridge, start_address + n) as usize;
+            let tile = cartridge.get_tile(index + if (self.bus.ppu.ctrl & CtrlFlag::Background as u8) > 0 { 256 } else { 0 });
+
+            // Get byte from attribute table
+            // let byte = self.bus.ppu.read(&self.bus.cartridge.as_ref().unwrap(), 0x23C0 | (addr & 0xC00) | ((addr >> 4) & 0x38) | ((addr >> 2) & 0x07));
+            // let byte = self.bus.ppu.nametables[(nth as usize * 960) + (n as usize / 4)];
+
+            // let (topleft, topright, bottomleft, bottomright) = (
+            //     byte & 0b11,
+            //     (byte >> 2) & 0b11,
+            //     (byte >> 4) & 0b11,
+            //     (byte >> 6) & 0b11,
+            // );
+            
+            // Get palette
+            // let quadrant = match (x % 2, y % 2) {
+            //     (0, 0) => topleft,
+            //     (1, 0) => topright,
+            //     (0, 1) => bottomleft,
+            //     (1, 1) => bottomright,
+            //     _ => panic!("Not possible"),
+            // };
+
+            // let palette = &self.bus.ppu.palettes[4 * quadrant as usize .. 4 * quadrant as usize + 4];
+            let palette = &self.bus.ppu.palettes[..4]; // Use first palette
+
+            // Draw tile
+            map.write_tile(x as usize, y as usize, tile.as_slice(), palette);
+        }
+
+        Clamped(map.buffer)
+    }
+
+    pub fn get_nametable_ram (&self) -> Vec<u8> {
+        self.bus.ppu.nametables.to_vec()
+    }
+
+    /**
+     * Get the contents of the CHR-ROM pattern tables.
+     * Pattern tables contain background graphics (right) and sprite graphics (left)
+     * https://wiki.nesdev.com/w/index.php/PPU_pattern_tables
+     */
+    pub fn get_pattern_tables (&self) -> Clamped<Vec<u8>> {
+        let cartridge = self.bus.cartridge.as_ref().unwrap();
+        let mut map = Tilemap::new(16, 32);
+        let palette = &self.bus.ppu.palettes[..4]; // Use first palette
+    
+        for n in 0..512 {
+            let x = n % 16;
+            let y = n / 16;
+
+            let tile = cartridge.get_tile(n);
+            map.write_tile(x, y, tile.as_slice(), palette);
+        }
+    
+        Clamped(map.buffer)
+    }
+
+    /**
+     * Get the palettes in use
+     */
+    pub fn get_palettes (&self) -> Clamped<Vec<u8>> {
+        let mut map = Tilemap::new(16, 2);
+
+        for n in 0..8 {
+            let palette = &self.bus.ppu.palettes[n * 4..n * 4 + 4];
+            let x = n * 4 % 16;
+            let y = n * 4 / 16;
+             
+            for index in 0..4 {
+                let tile = vec![index as u8; 8 * 8];
+                map.write_tile(x + index, y, tile.as_slice(), palette);
+            }
+        }
+
+        Clamped(map.buffer)
+    }
+
+    /**
+     * Get the system palette
+     */
+    pub fn get_palette (&self) -> Clamped<Vec<u8>> {
+        let mut map = Tilemap::new(16, 4);
+
+        for color in 0..64 {
+            let tile = vec![0; 8 * 8];
+            map.write_tile(color % 16, color / 16, tile.as_slice(), &[color as u8]);
+        }
+
+        Clamped(map.buffer)
+    }
+
+    // pub fn get_ram (&self) -> Vec<u8> {
+    //     self.bus.wram.to_vec()
+    // }
 }
 
 impl Default for Nes {

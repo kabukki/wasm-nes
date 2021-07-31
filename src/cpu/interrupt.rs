@@ -2,6 +2,7 @@
 
 pub const INTERRUPT_LATENCY: u8 = 7;
 
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Interrupt {
     /**
      * Non-maskable interrupt

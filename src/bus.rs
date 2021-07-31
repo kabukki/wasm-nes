@@ -1,4 +1,4 @@
-use log::debug;
+// use log::{debug, trace};
 use crate::ppu::Ppu;
 use crate::cartridge::Cartridge;
 
@@ -37,7 +37,7 @@ pub const CARTRIDGE_BANK_SIZE: usize            = 0x4000;
  * Memory map for the CPU
  */
 pub struct Bus {
-    pub wram: [u8; 0x0800], // 2 KiB, mirrored (max 11 bits)
+    pub wram: [u8; 0x800], // 2 KiB, mirrored (max 11 bits)
     pub ppu: Ppu,
     pub cartridge: Option<Cartridge>,
 }
@@ -51,19 +51,25 @@ impl Bus {
         }
     }
 
-    pub fn read (&self, address: u16) -> u8 {
+    pub fn load (&mut self, rom: &Vec<u8>) {
+        self.cartridge = Some(Cartridge::new(rom));
+    }
+
+    pub fn read (&mut self, address: u16) -> u8 {
+        let cartridge = self.cartridge.as_ref().unwrap();
+
         match address {
-            MEMORY_RAM_START ..= MEMORY_RAM_END => self.wram[usize::from(address - MEMORY_RAM_START) % 0x0800],
-            a @ MEMORY_IO_START ..= MEMORY_IO_END => {
-                debug!("I/O READ");
-                match a % 8 + 0x2000 {
-                    0x2002 => self.ppu.status,
-                    0x2004 => self.ppu.oam_data,
-                    0x2007 => self.ppu.data,
-                    _ => panic!("Invalid I/O read"),
+            MEMORY_RAM_START ..= MEMORY_RAM_END => self.wram[usize::from(address - MEMORY_RAM_START) % 0x800],
+            MEMORY_IO_START ..= MEMORY_IO_END => {
+                // debug!("I/O READ {:#x}", address);
+                match address {
+                    0x2002 ..= 0x2007 => self.ppu.read(cartridge, address),
+                    0x4016 => 0, // Controller 1
+                    0x4017 => 0, // Controller 2
+                    _ => panic!("Invalid I/O read {:#x}", address),
                 }
             },
-            MEMORY_CARTRIDGE_PRG_START ..= MEMORY_CARTRIDGE_END => self.cartridge.as_ref().unwrap().read_prg((address - MEMORY_CARTRIDGE_PRG_START as u16) % 0x4000), // should be handled by mapper if 1 or 2 banks
+            MEMORY_CARTRIDGE_PRG_START ..= MEMORY_CARTRIDGE_END => cartridge.read_prg((address - MEMORY_CARTRIDGE_PRG_START as u16) % 0x4000), // should be handled by mapper if 1 or 2 banks
             _ => unimplemented!(),
             // MEMORY_SRAM_START ..= MEMORY_SRAM_END => self.wram[usize::from(address - MEMORY_SRAM_START)],
             // MEMORY_ROM_START ..= MEMORY_ROM_END => self.wram[usize::from(address - MEMORY_ROM_START)],
@@ -71,25 +77,28 @@ impl Bus {
     }
 
     pub fn write (&mut self, address: u16, data: u8) {
+        let cartridge = self.cartridge.as_mut().unwrap();
+
         match address {
-            MEMORY_RAM_START ..= MEMORY_RAM_END => self.wram[usize::from(address - MEMORY_RAM_START) % 0x0800] = data,
-            a @ MEMORY_IO_START ..= MEMORY_IO_END => {
-                debug!("I/O WRITE");
-                match a % 8 + 0x2000 {
-                    0x2000 => { self.ppu.ctrl = data; },
-                    0x2001 => { self.ppu.mask = data; },
-                    0x2003 => { self.ppu.oam_address = data; },
-                    0x2004 => { self.ppu.oam_data = data; },
-                    0x2005 => { self.ppu.scroll = data; },
-                    // 0x2006 => { self.ppu.address = data; }, ppu.write_address()
-                    0x2007 => { self.ppu.data = data; },
-                    _ => panic!("Invalid I/O read"),
+            MEMORY_RAM_START ..= MEMORY_RAM_END => self.wram[usize::from(address - MEMORY_RAM_START) % 0x800] = data,
+            MEMORY_IO_START ..= MEMORY_IO_END => {
+                // trace!("I/O WRITE {:#x} {}", address, data);
+                match address {
+                    0x2000 ..= 0x3FFF => { self.ppu.write(cartridge, address, data); }
+                    0x4000 ..= 0x4013 => {}, // APU
+                    0x4014 => {}, // OAM DMA
+                    0x4015 => {}, // APU
+                    0x4016 => {}, // Controllers
+                    0x4017 => {}, // APU
+                    _ => panic!("Invalid I/O write {:#x}", address),
                 }
             },
-            _ => unimplemented!(),
             // 0x4014 => ppu.write_dma(data)
             // MEMORY_SRAM_START ..= MEMORY_SRAM_END => self.wram[usize::from(address - MEMORY_SRAM_START)],
-            // MEMORY_ROM_START ..= MEMORY_ROM_END => self.wram[usize::from(address - MEMORY_ROM_START)],
+            MEMORY_CARTRIDGE_START ..= MEMORY_CARTRIDGE_END => {
+                cartridge.write(address, data);
+            },
+            _ => panic!("Invalid write {:#x}", address),
         };
     }
 }

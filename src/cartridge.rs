@@ -1,8 +1,7 @@
 use wasm_bindgen::prelude::*;
-use log::{debug, trace};
+use log::debug;
 use std::io::prelude::*;
 use std::io::Cursor;
-use crate::ppu::palette::BACKGROUND_PALETTE;
 
 // iNES format
 // http://wiki.nesdev.com/w/index.php/INES
@@ -32,9 +31,8 @@ pub enum Mirroring {
     FourScreen,
 }
 
-#[wasm_bindgen]
 pub struct Cartridge {
-    // sram: [u8; 2048],
+    sram: [u8; 2048],
     prg_rom: Vec<u8>,
     chr_rom: Vec<u8>,
     // ram: Vec<u8>,
@@ -42,9 +40,8 @@ pub struct Cartridge {
     // pub mapper: dyn Mapper
 }
 
-#[wasm_bindgen]
 impl Cartridge {
-    pub fn new (rom: &[u8]) -> Self {
+    pub fn new (rom: &Vec<u8>) -> Self {
         let mut cursor = Cursor::new(rom);
         let mut header = [0u8; 16];
         cursor.read_exact(&mut header).expect("Could not read header");
@@ -67,7 +64,7 @@ impl Cartridge {
         debug!("PRG-ROM banks: {}\nCHR-ROM banks: {}\nMapper: {}\nRAM size: {}\nHas trainer ? {}", chr_rom_banks, prg_rom_banks, mapper, ram, trainer);
 
         let mut cartridge = Cartridge {
-            // sram: [0; 2048],
+            sram: [0; 2048],
             prg_rom: vec![0; prg_rom_banks * PRG_ROM_BANK_SIZE],
             chr_rom: vec![0; chr_rom_banks * CHR_ROM_BANK_SIZE],
             // ram: vec![0; ram * RAM_BANK_SIZE],
@@ -84,62 +81,54 @@ impl Cartridge {
         cartridge
     }
 
-    /**
-     * Get the nth tile from CHR-ROM pattern tables.
-     * https://wiki.nesdev.com/w/index.php/PPU_pattern_tables
-     */
     pub fn get_tile (&self, n: usize) -> Vec<u8> {
-        let mut result = Vec::with_capacity(8 * 8 * 4);
-        let tile = &self.chr_rom[n * 16..n * 16 + 16];
+        let mut tile = Vec::with_capacity(8 * 8);
 
-        for y in 0..8 {
-            let (hi, lo) = (tile[y + 8], tile[y]);
+        for tile_y in 0..8 {
+            let (hi, lo) = (self.chr_rom[n * 16 + tile_y + 8], self.chr_rom[n * 16 + tile_y]);
     
-            for x in 0..8 {
-                let (hi, lo) = (hi >> (7 - x) & 1, lo >> (7 - x) & 1);
-                let pixel = hi << 1 | lo;
-    
-                let (r, g, b) = match pixel {
-                    0 => BACKGROUND_PALETTE[0x00],
-                    1 => BACKGROUND_PALETTE[0x16],
-                    2 => BACKGROUND_PALETTE[0x28],
-                    3 => BACKGROUND_PALETTE[0x19],
-                    _ => panic!("Invalid color"),
-                };
-
-                result.extend([r, g, b, 255].iter());
+            for tile_x in 0..8 {
+                let (hi, lo) = (hi >> (7 - tile_x) & 1, lo >> (7 - tile_x) & 1);
+                tile.push(hi << 1 | lo);
             }
         }
 
-        result
-    }
-
-    pub fn get_tiles (&self) -> Vec<u8> {
-        let mut result = Vec::new();
-
-        for n in 0..512 {
-            result.extend(self.get_tile(n).iter());
-        }
-
-        result
+        tile
     }
 
     pub fn get_mirroring (&self) -> Mirroring {
         self.mirroring
     }
     
-    // Mapper
-    pub fn read (&self, _address: u16) -> u8 {
-        0
-    }
-
     pub fn read_chr (&self, address: u16) -> u8 {
-        trace!("Read CHR @ {:#x} -> {:#x}", address, self.chr_rom[address as usize]);
+        // trace!("Read CHR @ {:#x} -> {:#x}", address, self.chr_rom[address as usize]);
         self.chr_rom[address as usize]
     }
 
     pub fn read_prg (&self, address: u16) -> u8 {
-        trace!("Read PRG @ {:#x} -> {:#x}", address, self.prg_rom[address as usize]);
+        // trace!("Read PRG @ {:#x} -> {:#x}", address, self.prg_rom[address as usize]);
         self.prg_rom[address as usize]
     }
+
+    pub fn write_prg (&mut self, address: u16, data: u8) {
+        // trace!("Read PRG @ {:#x} -> {:#x}", address, self.prg_rom[address as usize]);
+        self.prg_rom[address as usize] = data;
+    }
+
+    // Mapper
+    pub fn read (&self, _address: u16) -> u8 {
+        0
+    }
+        
+    // Mapper
+    pub fn write (&mut self, address: u16, data: u8) {
+        match address {
+            0x6000 ..= 0x7FFF => {
+                self.sram[address as usize - 0x4020] = data;
+            },
+            _ => panic!("Invalid cartridge RAM write {:#x}", address),
+        }
+        // trace!("Read PRG @ {:#x} -> {:#x}", address, self.prg_rom[address as usize]);
+    }
+
 }

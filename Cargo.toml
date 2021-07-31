@@ -5,7 +5,8 @@ authors = ["Lucien Le Roux <rshn.kabu@gmail.com>"]
 edition = "2018"
 
 [lib]
-crate-type = ["cdylib"]
+name = "wasm_nes"
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 log = "0.4"

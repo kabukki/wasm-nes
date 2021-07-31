@@ -1,6 +1,12 @@
-# Nintendo Entertainment System
+# 🕹 Nintendo Entertainment System
 
 > The Nintendo Entertainment System (NES) is an 8-bit third-generation home video game console produced by Nintendo. Nintendo first released it in Japan as the Family Computer, commonly known as the Famicom, in 1983. The NES, a remodelled version, was released internationally in the following years.
+
+## Implementation status
+
+### Mappers
+
+For now, mappers are not supported, only `NROM` games can run.
 
 ## Technical specifications
 
@@ -64,19 +70,19 @@ init().then(() => {
 
 #### Opcodes
 
-- https://www.masswerk.at/6502/6502_instruction_set.html
+- https://www.masswerk.at/6502/6502_instruction_set.html (contains errors for instruction timing)
 - http://www.obelisk.me.uk/6502/reference.html
 
 ### Examples & tutorials
 
-- https://github.com/koute/pinky
 - https://github.com/gianlucag/mos6502
-- https://skilldrick.github.io/easy6502/
-- https://github.com/GarettCooper/emulator_6502
 - https://github.com/GarettCooper/gc_nes_emulator
 - https://github.com/daniel5151/ANESE
+- https://skilldrick.github.io/easy6502/
 - https://famicom.party/book
 - https://bugzmanov.github.io/nes_ebook
+- http://emudev.de/
+- https://austinmorlan.com/posts/nes_rendering_overview/
 
 ### ROMs & Tests
 
@@ -89,10 +95,11 @@ init().then(() => {
     - https://www.qmtpro.com/~nes/misc
     - https://www.qmtpro.com/~nes/misc/nestest.txt
 
-### Talks
+### Videos & talks
 
 - https://www.youtube.com/watch?v=fWqBmmPQP40
 - https://www.youtube.com/watch?v=DMcx9DAHrZQ
+- https://www.youtube.com/watch?v=-THeUXqR3zY
 
 ### Writing assembly for the platform
 

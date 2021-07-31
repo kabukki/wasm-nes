@@ -12,7 +12,9 @@ import init, { Nes, set_panic_hook, set_log } from './pkg';
 
 interface Options {
     clockSpeed: number;
+    frameRate: number;
     onError?: (err: Error) => void;
+    onCycle?: (framebuffer: any) => void;
 }
 
 export class Emulator {
@@ -21,6 +23,7 @@ export class Emulator {
 
     constructor () {
         this.vm = Nes.new();
+        this.interval = null;
     }
 
     load (rom: Uint8Array) {
@@ -29,25 +32,49 @@ export class Emulator {
 
     start ({
         clockSpeed = 1000 / 5369,
+        frameRate = 1000 / 30,
         onError,
+        onCycle,
     }: Options) {
         this.interval = setInterval(() => {
             try {
-                this.vm.cycle();
+                onCycle(this.cycle());
             } catch (err) {
                 this.stop();
                 onError?.(err);
             }
-        }, clockSpeed);
+        }, frameRate);
     }
 
     stop () {
-        clearInterval(this.interval);
+        window.clearInterval(this.interval);
+    }
+
+    cycle () {
+        const frame = this.vm.cycle();
+
+        return {
+            framebuffer: this.vm.get_framebuffer(),
+            nametables: [
+                this.vm.get_nametable(0),
+                this.vm.get_nametable(1),
+                this.vm.get_nametable(2),
+                this.vm.get_nametable(3),
+            ],
+            frame,
+        };
+    }
+
+    debug () {
+        return {
+            nametables_ram: this.vm.get_nametable_ram(),
+            patternTables: this.vm.get_pattern_tables(),
+            palettes: this.vm.get_palettes(),
+            palette: this.vm.get_palette(),
+        }; 
     }
 }
 
 export default function () {
     return init().then(set_panic_hook).then(set_log);
 }
-
-export { Cartridge } from './pkg';

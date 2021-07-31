@@ -10,6 +10,7 @@
     "build:js": "esbuild --bundle --outdir=dist --sourcemap --format=esm index.ts && tsc --emitDeclarationOnly && cp pkg/*.wasm dist",
     "build": "npm run build:wasm && npm run build:js",
     "lint": "cargo clippy",
+    "test": "cargo test",
     "prepack": "npm run build"
   },
   "devDependencies": {

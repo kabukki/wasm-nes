@@ -134,14 +134,14 @@ impl Nes {
     pub fn get_pattern_tables (&self) -> Clamped<Vec<u8>> {
         let cartridge = self.bus.cartridge.as_ref().unwrap();
         let mut map = Tilemap::new(16, 32);
-        let palette = &self.bus.ppu.palettes[..4]; // Use first palette
+        let palette = [0x0D, 0x00, 0x10, 0x20]; // Greyscale palette
     
         for n in 0..512 {
             let x = n % 16;
             let y = n / 16;
 
             let tile = cartridge.get_tile(n);
-            map.write_tile(x, y, tile.as_slice(), palette);
+            map.write_tile(x, y, tile.as_slice(), &palette);
         }
     
         Clamped(map.buffer)

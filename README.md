@@ -1,25 +1,16 @@
 # 🕹 Nintendo Entertainment System
 
+A **NES** emulator written in Rust compiled to WebAssemly for usage on the web.
+
 > The Nintendo Entertainment System (NES) is an 8-bit third-generation home video game console produced by Nintendo. Nintendo first released it in Japan as the Family Computer, commonly known as the Famicom, in 1983. The NES, a remodelled version, was released internationally in the following years.
 
-## Implementation status
+Current implementation status:
 
-### Mappers
-
-For now, mappers are not supported, only `NROM` games can run.
-
-## Technical specifications
-
-- **Central Processing Unit**: Ricoh 2A03 (NTSC) vs 2A07 (PAL) chip
-    - CPU based on MOS 6502
-    - Pseudo-**Audio Processing Unit** capabilities
-    - 3 general-purpose registers
-    - Little-endian
-    - 16-bit address bus
-- **Pixel Processing Unit**: Ricoh 2C02
-    - Memory: 16KiB VRAM
-
-Cartridge ROM is accessed by the CPU through a **Memory Management Controller** (MMC) aka mapper, used to determine which bank to load into memory.
+- Central Processing Unit (Ricoh 2A03) ✅
+- Pixel Processing Unit 🚧
+- Audio Processing Unit ❌
+- Cartridge [mappers](https://wiki.nesdev.com/w/index.php/Mapper) ❌
+    - *Mappers are not supported yet, only `NROM` games can run.*
 
 ## Development
 

@@ -11,19 +11,22 @@ import init, { Nes, set_panic_hook, set_log } from './pkg';
  */
 
 interface Options {
-    clockSpeed: number;
+    clockRate: number;
     frameRate: number;
+    debugRate: number;
     onError?: (err: Error) => void;
-    onCycle?: (framebuffer: any) => void;
+    onCycle?: (frame: number) => void;
+    onDebug?: (info: any) => void;
+    onDisplay?: (nametables: Uint8ClampedArray[]) => void;
 }
 
 export class Emulator {
     private vm: Nes;
-    private interval: ReturnType<typeof setInterval>;
+    private intervals: ReturnType<typeof setInterval>[];
 
     constructor () {
         this.vm = Nes.new();
-        this.interval = null;
+        this.intervals = [];
     }
 
     load (rom: Uint8Array) {
@@ -31,38 +34,44 @@ export class Emulator {
     }
 
     start ({
-        clockSpeed = 1000 / 5369,
+        clockRate = 1000 / 5369,
         frameRate = 1000 / 30,
+        debugRate = 1000 / 1,
         onError,
         onCycle,
+        onDebug,
+        onDisplay,
     }: Options) {
-        this.interval = setInterval(() => {
+        this.intervals = [
+            [this.cycle.bind(this), onCycle, clockRate],
+            [this.display.bind(this), onDisplay, frameRate],
+            [this.debug.bind(this), onDebug, debugRate],
+        ].map(([fn, callback, interval]) => setInterval(() => {
             try {
-                onCycle(this.cycle());
+                callback(fn());
             } catch (err) {
                 this.stop();
                 onError?.(err);
             }
-        }, frameRate);
+        }, interval));
     }
 
     stop () {
-        window.clearInterval(this.interval);
+        this.intervals.forEach(window.clearInterval);
     }
 
     cycle () {
-        const frame = this.vm.cycle();
-
-        return {
-            framebuffer: this.vm.get_framebuffer(),
-            nametables: [
-                this.vm.get_nametable(0),
-                this.vm.get_nametable(1),
-                this.vm.get_nametable(2),
-                this.vm.get_nametable(3),
-            ],
-            frame,
-        };
+        return this.vm.cycle();
+    }
+    
+    display () {
+        // framebuffer: this.vm.get_framebuffer(),
+        return [
+            this.vm.get_nametable(0),
+            this.vm.get_nametable(1),
+            this.vm.get_nametable(2),
+            this.vm.get_nametable(3),
+        ];
     }
 
     debug () {

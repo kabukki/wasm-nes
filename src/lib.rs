@@ -124,14 +124,14 @@ impl Nes {
     pub fn get_pattern_tables (&self) -> Clamped<Vec<u8>> {
         let cartridge = self.bus.cartridge.as_ref().unwrap();
         let mut map = Tilemap::new(16, 32);
-        let palette = [0x0D, 0x00, 0x10, 0x20]; // Greyscale palette
+        let (bg_palette, fg_palette) = (&self.bus.ppu.palettes[..4], &self.bus.ppu.palettes[16..20]);
     
         for n in 0..512 {
             let x = n % 16;
             let y = n / 16;
 
             let tile = cartridge.get_tile(n);
-            map.write_tile(x, y, tile.as_slice(), &palette);
+            map.write_tile(x, y, tile.as_slice(), &(if n >= 256 { bg_palette } else { fg_palette }));
         }
     
         Clamped(map.buffer)
@@ -143,15 +143,12 @@ impl Nes {
     pub fn get_palettes (&self) -> Clamped<Vec<u8>> {
         let mut map = Tilemap::new(16, 2);
 
-        for n in 0..8 {
-            let palette = &self.bus.ppu.palettes[n * 4..n * 4 + 4];
-            let x = n * 4 % 16;
-            let y = n * 4 / 16;
-             
-            for index in 0..4 {
-                let tile = vec![index as u8; 8 * 8];
-                map.write_tile(x + index, y, tile.as_slice(), palette);
-            }
+        for n in 0..32 {
+            let color = self.bus.ppu.palettes[n];
+            let x = n % 16;
+            let y = n / 16;
+            let tile = vec![0; 8 * 8];
+            map.write_tile(x, y, tile.as_slice(), &[color]);
         }
 
         Clamped(map.buffer)

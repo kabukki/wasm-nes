@@ -69,11 +69,13 @@ impl Nes {
 
         // Clamped(buffer8)
 
-        Clamped(
-            unsafe {
-                self.bus.ppu.framebuffer.align_to::<u8>().1.to_vec()
-            }
-        )
+        // Clamped(
+        //     unsafe {
+        //         self.bus.ppu.framebuffer.align_to::<u8>().1.to_vec()
+        //     }
+        // )
+
+        Clamped(self.bus.ppu.framebuffer.to_vec())
     }
 
     /**

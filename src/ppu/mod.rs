@@ -7,7 +7,6 @@
  * 
  * https://wiki.nesdev.com/w/index.php/PPU_frame_timing
  * https://wiki.nesdev.com/w/index.php/PPU_pattern_tables
- * https://wiki.nesdev.com/w/index.php/PPU_scrolling
  * https://www.reddit.com/r/EmuDev/comments/evu3u2/what_does_the_nes_ppu_actually_do/
  * http://wiki.nesdev.com/w/index.php/Mirroring
  * http://wiki.nesdev.com/w/index.php/PPU_nametables
@@ -16,11 +15,12 @@
 use log::{info, debug};
 use crate::cpu::{Cpu, interrupt::Interrupt};
 use crate::cartridge::{Cartridge, Mirroring};
+use crate::ppu::palette::PALETTE;
 
 pub mod palette;
 
 pub enum CtrlFlag {
-    Nametable       = 0b0000_0011,  // Nametable address
+    Nametable       = 0b0000_0011,  // Nametable select
     Increment       = 0b0000_0100,  // VRAM address increment per read or write: -32 or +1
     Sprite          = 0b0000_1000,  // Sprite pattern table address for 8x8 sprites
     Background      = 0b0001_0000,  // Background pattern table address
@@ -46,6 +46,17 @@ pub enum StatusFlag {
     VBlank          = 0b1000_0000,  // Vertical blank
 }
 
+pub enum LoopyRegister {
+    CoarseX         = 0b00000000_00011111, // Coarse X offset (0-31)
+    CoarseY         = 0b00000011_11100000, // Coarse Y offset (0-31)
+    Nametable       = 0b00001100_00000000, // Nametable select
+    FineY           = 0b01110000_00000000, // Fine Y offset (0-7)
+    Unused          = 0b10000000_00000000,
+}
+
+pub const NAMETABLE_X_MASK: u16 = 0b00000100_00000000;
+pub const NAMETABLE_Y_MASK: u16 = 0b00001000_00000000;
+
 pub struct Ppu {
     pub ctrl: u8,
     pub mask: u8,
@@ -53,26 +64,30 @@ pub struct Ppu {
     pub oam_address: u8,
     pub oam_data: u8,
     pub oam_dma: u8,
-    pub scroll: u8,
     pub data: u8,
     pub nametables: [u8; 0x800], // Nametables. 2x1KiB (2 screen states)
     pub palettes: [u8; 0x20], // Palettes. 4x4 background + 4x4 sprite
     pub dot: u16,
     pub scanline: u16,
-    pub framebuffer: Box<[u32; 256 * 240]>, // 512x480 -> 256x240 (32x30 = 960 tiles)
+    pub framebuffer: Box<[u8; 256 * 240 * 4]>, // 512x480 -> 256x240 (32x30 = 960 tiles)
     write_latch: bool,
     read_buffer: u8,
     pub frame: usize,
     
     // Background
-    pub address: u16,
+    pub cur_address: u16, // loopy_v
+    pub tmp_address: u16, // loopy_t
+    pattern_tile_id: u8,
     pattern_latch_hi: u8,
     pattern_latch_lo: u8,
     pattern_shift_hi: u16,
     pattern_shift_lo: u16,
-    // palette_shift_hi: u8,
-    // palette_shift_lo: u8,
+    palette_latch: u8,
+    palette_shift_hi: u16,
+    palette_shift_lo: u16,
 
+    // Scrolling
+    scroll_x_fine: u8, // Fine X offset (0-7)
 
     // Sprites
     pub oam: [u8; 256], // Sprite RAM: 64 * 4 bytes (Y, tile #, attribute, X)
@@ -87,29 +102,33 @@ impl Ppu {
             oam_address: 0,
             oam_data: 0,
             oam_dma: 0,
-            scroll: 0,
             data: 0,
             nametables: [0; 0x800],
             palettes: [0; 0x20],
             oam: [0; 256],
             dot: 0,
             scanline: 261, // start @ pre-render
-            framebuffer: Box::new([0b00000000_00000000_00000000_11111111; 256 * 240]),
+            framebuffer: Box::new([0; 256 * 240 * 4]),
             write_latch: false,
             read_buffer: 0,
             frame: 0,
-            address: 0,
+            cur_address: 0,
+            tmp_address: 0,
+            pattern_tile_id: 0,
             pattern_latch_hi: 0,
             pattern_latch_lo: 0,
             pattern_shift_hi: 0,
             pattern_shift_lo: 0,
-            // palette_shift_hi: 0,
-            // palette_shift_lo: 0,        
+            palette_latch: 0,
+            palette_shift_hi: 0,
+            palette_shift_lo: 0,
+            scroll_x_fine: 0,
         }
     }
 
     /**
      * https://wiki.nesdev.com/w/index.php/PPU_rendering
+     * https://wiki.nesdev.com/w/index.php/PPU_scrolling
      * https://wiki.nesdev.com/w/images/d/d1/Ntsc_timing.png
      */
     pub fn cycle (&mut self, cartridge: &Cartridge, cpu: &mut Cpu) {
@@ -121,53 +140,146 @@ impl Ppu {
                     0 => {}, // Idle
                     // Draw pixels for scanline
                     1 ..= 256 | 321 ..= 336 => {
-                        // // let offset = (self.ctrl & CtrlFlag::Nametable as u8) as u16 * 0x400;
-                        // // let tile = self.read(bus, self.address + offset);
-                        // //  bus.cartridge.unwrap().
-                        // if self.mask & MaskFlag::Background as u8 != 0 {
-                        //     self.pattern_shift_hi <<= 1;
-                        //     self.pattern_shift_lo <<= 1;
-                        // }
+                        if self.mask & MaskFlag::Background as u8 > 0 {
+                            self.pattern_shift_hi <<= 1;
+                            self.pattern_shift_lo <<= 1;
+                            self.palette_shift_hi <<= 1;
+                            self.palette_shift_lo <<= 1;
+                        }
+
+                        // Load data for next background tile. Each memory access takes 2 PPU cycles to complete, and 4 must be performed per tile
+                        match self.dot % 8 {
+                            // Horizontal increment (coarse because by-tile basis)
+                            0 => {
+                                if (self.mask & MaskFlag::Background as u8) > 0 {
+                                    if (self.cur_address & LoopyRegister::CoarseX as u16) < 31 {
+                                        // Increment coarse X
+                                        self.cur_address += (1 << 0) as u16;
+                                    } else {
+                                        // Nametable edge, go to other horizontal nametable and reset coarse X to 0
+                                        self.cur_address = (self.cur_address & !(LoopyRegister::CoarseX as u16)) | ((self.cur_address & LoopyRegister::Nametable as u16) ^ NAMETABLE_X_MASK);
+                                        // debug!("v is now {:#x}", self.cur_address);
+                                    }
+                                }
+                            },
+                            // Nametable byte
+                            1 => {
+                                // Load next pixels into the shifters
+                                self.pattern_shift_hi = (self.pattern_shift_hi & 0b11111111_00000000) | self.pattern_latch_hi as u16;
+                                self.pattern_shift_lo = (self.pattern_shift_lo & 0b11111111_00000000) | self.pattern_latch_lo as u16;
+                                // Load next palette into the shifters
+                                self.palette_shift_hi = (self.palette_shift_hi & 0b11111111_00000000) | if self.palette_latch & 0b10 as u8 != 0 { 0b11111111 } else { 0b00000000 };
+                                self.palette_shift_lo = (self.palette_shift_lo & 0b11111111_00000000) | if self.palette_latch & 0b01 as u8 != 0 { 0b11111111 } else { 0b00000000 };
+
+                                self.pattern_tile_id = self.read_vram(
+                                    cartridge,
+                                    0x2000
+                                    | (self.cur_address & (LoopyRegister::Nametable as u16 | LoopyRegister::CoarseX as u16 | LoopyRegister::CoarseY as u16))
+                                );
+                            },
+                            // Attribute table byte. See https://github.com/OneLoneCoder/olcNES/blob/master/Part%20%234%20-%20PPU%20Backgrounds/olc2C02.cpp#L802
+                            3 => {
+                                let byte = self.read_vram(
+                                    cartridge,
+                                    0x23C0
+                                    | (self.cur_address & CtrlFlag::Nametable as u16)
+                                    | (self.cur_address & LoopyRegister::CoarseX as u16 >> 0) / 4
+                                    | (self.cur_address & LoopyRegister::CoarseY as u16 >> 5) / 4 * 8
+                                );
+                                self.palette_latch = match ((self.cur_address & LoopyRegister::CoarseX as u16) % 4 / 2, ((self.cur_address & LoopyRegister::CoarseY as u16) >> 5) % 4 / 2) {
+                                    (0, 0) => (byte >> 0), // Top left
+                                    (1, 0) => (byte >> 2), // Top right
+                                    (0, 1) => (byte >> 4), // Bottom left
+                                    (1, 1) => (byte >> 6), // Bottom right
+                                    _ => panic!("Not possible"),
+                                } & 0b11;
+                            },
+                            // Pattern table tile low byte
+                            5 => {
+                                self.pattern_latch_lo = self.read_vram(
+                                    cartridge,
+                                    0x1000
+                                    * ((self.ctrl as u16 & CtrlFlag::Background as u16) >> 4)
+                                    + (self.pattern_tile_id as u16 * 16)
+                                    + ((self.cur_address & LoopyRegister::FineY as u16) >> 12)
+                                    + 0
+                                );
+                            },
+                            // Pattern table tile high byte
+                            7 => {
+                                self.pattern_latch_hi = self.read_vram(
+                                    cartridge,
+                                    0x1000
+                                    * ((self.ctrl as u16 & CtrlFlag::Background as u16) >> 4)
+                                    + (self.pattern_tile_id as u16 * 16)
+                                    + ((self.cur_address & LoopyRegister::FineY as u16) >> 12)
+                                    + 8
+                                );
+                            },
+                            _ => {},
+                        }
 
                         // Pre-render. Clear VBlank and Sprite 0 hit bits
                         if self.dot == 1 && self.scanline == 261 {
                             self.status &= !(StatusFlag::VBlank as u8 | StatusFlag::Hit as u8);
                         }
 
-                        // // Draw pixel on visible scanlines
-                        // if self.dot <= 256 && self.scanline != 261 {
-                        //     // self.framebuffer[self.scanline as usize * 256 + self.dot as usize] = 0b11111111_00000000_00000000_11111111;
-                        //     // self.framebuffer[self.scanline as usize * 256 + self.dot as usize] = self.pattern_shift_hi | self.pattern_shift_lo;
-                        // }
+                        // Draw pixel on visible scanlines
+                        if self.dot <= 256 && self.scanline != 261 && (self.ctrl & CtrlFlag::Background as u8) > 0 {
+                            let (hi, lo) = ((self.pattern_shift_hi >> 8) as u8 >> (7 - self.scroll_x_fine), (self.pattern_shift_lo >> 8) as u8 >> (7 - self.scroll_x_fine));
+                            let pixel = hi << 1 | lo;
+                            
+                            let (hi, lo) = ((self.palette_shift_hi >> 8) as u8 >> (7 - self.scroll_x_fine), (self.palette_shift_lo >> 8) as u8 >> (7 - self.scroll_x_fine));
+                            let palette = hi << 1 | lo;
+                            
+                            let color = self.palettes[4 * palette as usize + pixel as usize];
+                            
+                            let n = (self.dot - 1) as usize + (256 * self.scanline as usize);
+                            let (r, g, b) = PALETTE[color as usize];
+                            self.framebuffer[4 * n .. 4 * n + 4].copy_from_slice(&[r, g, b, 255]);
+                        }
 
-                        // // Load data into background shifters
-                        // // Each memory access takes 2 PPU cycles to complete, and 4 must be performed per tile
-                        // match self.dot % 8 {
-                        //     // vert(v) inc.
-                        //     0 => {},
-                        //     // NT byte
-                        //     1 => {
-                        //         // Reload shifters
-                        //         self.pattern_shift_hi = (self.pattern_shift_hi & 0b11111111_00000000) | self.pattern_latch_hi as u16;
-                        //         self.pattern_shift_lo = (self.pattern_shift_lo & 0b11111111_00000000) | self.pattern_latch_lo as u16;
-                        //     },
-                        //     // AT byte
-                        //     3 => {},
-                        //     // PT tile byte lo
-                        //     5 => {
-                        //         self.pattern_latch_lo = cartridge.chr_rom[self.dot as usize / 8];
-                        //     },
-                        //     // PT tile byte hi
-                        //     7 => {
-                        //         self.pattern_latch_hi = cartridge.chr_rom[self.dot as usize / 8 + 8];
-                        //     },
-                        //     _ => {},
-                        // }
+                        // Vertical increment (fine because by-scanline basis)
+                        if self.dot == 256 && (self.mask & MaskFlag::Background as u8) > 0 {
+                            self.cur_address += (1 << 5) as u16;
+        
+                            if (self.cur_address & LoopyRegister::FineY as u16) < 7 {
+                                // Increment coarse & fine Y
+                                self.cur_address += (1 << 5) as u16;
+                            } else {
+                                // Reset fine Y to 0
+                                self.cur_address = self.cur_address & !(LoopyRegister::FineY as u16);
+                                // debug!("v is now {:#x}", self.cur_address);
+
+                                if (self.cur_address & LoopyRegister::CoarseY as u16) < 30 {
+                                    // Increment coarse Y
+                                    self.cur_address += (1 << 5) as u16;
+                                } else {
+                                    // Nametable edge, go to other vertical nametable and reset coarse Y to 0
+                                    self.cur_address = (self.cur_address & !(LoopyRegister::CoarseY as u16)) | ((self.cur_address & LoopyRegister::Nametable as u16) ^ NAMETABLE_Y_MASK);
+                                }
+                            }
+                        }
                     },
+                    // Sprite
                     257 ..= 320 => {
-                        // Sprite
-                        // hori(v) = hori(t)
+                        if (self.mask & MaskFlag::Background as u8) > 0 {
+                            // Load X info from temporary address
+                            if self.dot == 257 {
+                                let mask = LoopyRegister::CoarseX as u16 | NAMETABLE_X_MASK;
+                                self.cur_address = (self.cur_address & !mask) | (self.tmp_address & mask);
+                                // debug!("v is now {:#x}", self.cur_address);
+                            }
+    
+                            // Load Y info from temporary address
+                            if self.scanline == 261 && self.dot >= 280 && self.dot <= 304 {
+                                let mask = LoopyRegister::CoarseY as u16 | LoopyRegister::FineY as u16 | NAMETABLE_Y_MASK;
+                                self.cur_address = (self.cur_address & !mask) | (self.tmp_address & mask);
+                                // debug!("v is now {:#x}", self.cur_address);
+                            }
+                        }
                     },
+                    // Unused NT byte fetches
                     337 ..= 340 => {},
                     _ => {},
                 }
@@ -211,6 +323,7 @@ impl Ppu {
 
     /**
      * Read registers
+     * https://wiki.nesdev.com/w/index.php/PPU_scrolling
      */
     pub fn read (&mut self, cartridge: &Cartridge, address: u16) -> u8 {
         match (address % 8) + 0x2000 {
@@ -229,14 +342,15 @@ impl Ppu {
             0x2007 => {
                 let mut dummy = self.read_buffer;
 
-                self.read_buffer = cartridge.read_chr(self.address);
+                self.read_buffer = cartridge.read_chr(self.cur_address);
 
                 // Palette read
-                if self.address >= 0x3F00 {
+                if self.cur_address >= 0x3F00 {
                     dummy = self.read_buffer;
                 }
 
-                self.address += if (self.ctrl & CtrlFlag::Increment as u8) > 0 { 32 } else { 1 };
+                self.cur_address += if (self.ctrl & CtrlFlag::Increment as u8) > 0 { 32 } else { 1 };
+                // debug!("v is now {:#x}", self.cur_address);
 
                 dummy
             },
@@ -246,11 +360,15 @@ impl Ppu {
 
     /**
      * Write to registers
+     * https://wiki.nesdev.com/w/index.php/PPU_scrolling
      */
     pub fn write (&mut self, cartridge: &Cartridge, address: u16, data: u8) {
         match (address % 8) + 0x2000 {
             // PPUCTRL
-            0x2000 => { self.ctrl = data; },
+            0x2000 => {
+                self.ctrl = data;
+                self.tmp_address = (self.tmp_address & !(LoopyRegister::Nametable as u16)) | ((self.ctrl as u16 & CtrlFlag::Nametable as u16) << 10);
+            },
             // PPUMASK
             0x2001 => { self.mask = data; },
             // OAMADDR
@@ -265,27 +383,39 @@ impl Ppu {
             },
             // PPUSCROLL
             0x2005 => {
-                self.scroll = data;
+                if self.write_latch {
+                    // Y scroll
+                    self.tmp_address = (self.tmp_address & !(LoopyRegister::FineY as u16)) | (data & 0b0000_0111) as u16;
+                    self.tmp_address = (self.tmp_address & !(LoopyRegister::CoarseY as u16)) | (data >> 3) as u16;
+                } else {
+                    // X scroll
+                    self.scroll_x_fine = data & 0b0000_0111;
+                    self.tmp_address = (self.tmp_address & !(LoopyRegister::CoarseX as u16)) | (data >> 3) as u16;
+                }
+
                 self.write_latch = !self.write_latch;
             },
             // PPUADDR
             0x2006 => {
                 if self.write_latch {
                     // Low byte
-                    self.address = (self.address & 0b11111111_00000000) | (data as u16);
+                    self.tmp_address = (self.tmp_address & 0b11111111_00000000) | (data as u16);
+                    self.cur_address = self.tmp_address;
+                    // debug!("v is now {:#x}", self.cur_address);
                 } else {
                     // High byte
-                    self.address = (self.address & 0b00000000_11111111) | ((data as u16) << 8);
+                    self.tmp_address = (self.tmp_address & 0b00000000_11111111) | ((data as u16) << 8);
                 }
-                
+
                 // debug!("Write address {:#x}, PPU address is now {:#x}", data, self.address);
-        
+
                 self.write_latch = !self.write_latch;
             },
             // PPUDATA
             0x2007 => {
-                self.write_vram(cartridge, self.address, data);
-                self.address += if (self.ctrl & CtrlFlag::Increment as u8) > 0 { 32 } else { 1 };
+                self.write_vram(cartridge, self.cur_address, data);
+                self.cur_address += if (self.ctrl & CtrlFlag::Increment as u8) > 0 { 32 } else { 1 };
+                // debug!("v is now {:#x}", self.cur_address);
             },
             _ => panic!("Invalid I/O write @ {:#x}", address),
         }
@@ -315,6 +445,7 @@ impl Ppu {
 
     /**
      * Write to memory
+     * https://wiki.nesdev.com/w/index.php/PPU_memory_map
      */
     fn write_vram (&mut self, cartridge: &Cartridge, address: u16, data: u8) {
         match address {

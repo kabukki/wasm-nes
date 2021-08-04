@@ -69,10 +69,7 @@ impl Bus {
                     _ => panic!("Invalid I/O read {:#x}", address),
                 }
             },
-            MEMORY_CARTRIDGE_PRG_START ..= MEMORY_CARTRIDGE_END => cartridge.read_prg((address - MEMORY_CARTRIDGE_PRG_START as u16) % 0x4000), // should be handled by mapper if 1 or 2 banks
-            _ => unimplemented!(),
-            // MEMORY_SRAM_START ..= MEMORY_SRAM_END => self.wram[usize::from(address - MEMORY_SRAM_START)],
-            // MEMORY_ROM_START ..= MEMORY_ROM_END => self.wram[usize::from(address - MEMORY_ROM_START)],
+            MEMORY_CARTRIDGE_START ..= MEMORY_CARTRIDGE_END => cartridge.read(address),
         }
     }
 
@@ -93,12 +90,9 @@ impl Bus {
                     _ => panic!("Invalid I/O write {:#x}", address),
                 }
             },
-            // 0x4014 => ppu.write_dma(data)
-            // MEMORY_SRAM_START ..= MEMORY_SRAM_END => self.wram[usize::from(address - MEMORY_SRAM_START)],
             MEMORY_CARTRIDGE_START ..= MEMORY_CARTRIDGE_END => {
                 cartridge.write(address, data);
             },
-            _ => panic!("Invalid write {:#x}", address),
         };
     }
 }

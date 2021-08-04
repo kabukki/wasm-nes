@@ -36,7 +36,7 @@ pub struct Cartridge {
     prg_rom: Vec<u8>,
     chr_rom: Vec<u8>,
     // ram: Vec<u8>,
-    mirroring: Mirroring,
+    pub mirroring: Mirroring,
     // pub mapper: dyn Mapper
 }
 
@@ -61,7 +61,7 @@ impl Cartridge {
             (false, true) => Mirroring::Horizontal,
         };
 
-        debug!("PRG-ROM banks: {}\nCHR-ROM banks: {}\nMapper: {}\nRAM size: {}\nHas trainer ? {}", chr_rom_banks, prg_rom_banks, mapper, ram, trainer);
+        debug!("PRG-ROM banks: {}\nCHR-ROM banks: {}\nMapper: {}\nRAM size: {}\nHas trainer ? {}\nMirroring: {:?}", chr_rom_banks, prg_rom_banks, mapper, ram, trainer, mirroring);
 
         let mut cartridge = Cartridge {
             sram: [0; 2048],
@@ -96,28 +96,19 @@ impl Cartridge {
         tile
     }
 
-    pub fn get_mirroring (&self) -> Mirroring {
-        self.mirroring
-    }
-    
     pub fn read_chr (&self, address: u16) -> u8 {
         // trace!("Read CHR @ {:#x} -> {:#x}", address, self.chr_rom[address as usize]);
         self.chr_rom[address as usize]
     }
 
-    pub fn read_prg (&self, address: u16) -> u8 {
-        // trace!("Read PRG @ {:#x} -> {:#x}", address, self.prg_rom[address as usize]);
-        self.prg_rom[address as usize]
-    }
-
-    pub fn write_prg (&mut self, address: u16, data: u8) {
-        // trace!("Read PRG @ {:#x} -> {:#x}", address, self.prg_rom[address as usize]);
-        self.prg_rom[address as usize] = data;
-    }
-
     // Mapper
-    pub fn read (&self, _address: u16) -> u8 {
-        0
+    pub fn read (&self, address: u16) -> u8 {
+        match address {
+            0x8000 ..= 0xFFFF => {
+                self.prg_rom[address as usize % 0x4000] // should be handled by mapper if 1 or 2 banks
+            },
+            _ => panic!("Invalid cartridge read {:#x}", address),
+        }
     }
         
     // Mapper
@@ -126,7 +117,10 @@ impl Cartridge {
             0x6000 ..= 0x7FFF => {
                 self.sram[address as usize - 0x4020] = data;
             },
-            _ => panic!("Invalid cartridge RAM write {:#x}", address),
+            0x8000 ..= 0xFFFF => {
+                self.prg_rom[address as usize % 0x4000] = data; // should be handled by mapper if 1 or 2 banks
+            },
+            _ => panic!("Invalid cartridge write {:#x}", address),
         }
         // trace!("Read PRG @ {:#x} -> {:#x}", address, self.prg_rom[address as usize]);
     }

@@ -65,17 +65,17 @@ export class Emulator {
     }
     
     display () {
-        // framebuffer: this.vm.get_framebuffer(),
-        return [
-            this.vm.get_nametable(0),
-            this.vm.get_nametable(1),
-            this.vm.get_nametable(2),
-            this.vm.get_nametable(3),
-        ];
+        return this.vm.get_framebuffer();
     }
 
     debug () {
         return {
+            nametables: [
+                this.vm.get_nametable(0),
+                this.vm.get_nametable(1),
+                this.vm.get_nametable(2),
+                this.vm.get_nametable(3),
+            ],
             nametables_ram: this.vm.get_nametable_ram(),
             patternTables: this.vm.get_pattern_tables(),
             palettes: this.vm.get_palettes(),

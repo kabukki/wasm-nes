@@ -133,14 +133,13 @@ impl Ppu {
      */
     pub fn cycle (&mut self, cartridge: &Cartridge, cpu: &mut Cpu) {
         match self.scanline {
-            // Fill shift registers with data for next scanline
             0 ..= 239 | 261 => {
                 // PPU busy fetching data, so PPU memory should not be accessed during this time (unless rendering is turned off - MaskFlags)
                 match self.dot {
                     0 => {}, // Idle
                     // Draw pixels for scanline
                     1 ..= 256 | 321 ..= 336 => {
-                        if self.mask & MaskFlag::Background as u8 > 0 {
+                        if (self.mask & MaskFlag::Background as u8) > 0 {
                             self.pattern_shift_hi <<= 1;
                             self.pattern_shift_lo <<= 1;
                             self.palette_shift_hi <<= 1;
@@ -158,7 +157,6 @@ impl Ppu {
                                     } else {
                                         // Nametable edge, go to other horizontal nametable and reset coarse X to 0
                                         self.cur_address = (self.cur_address & !(LoopyRegister::CoarseX as u16)) | ((self.cur_address & LoopyRegister::Nametable as u16) ^ NAMETABLE_X_MASK);
-                                        // debug!("v is now {:#x}", self.cur_address);
                                     }
                                 }
                             },
@@ -177,14 +175,16 @@ impl Ppu {
                                     | (self.cur_address & (LoopyRegister::Nametable as u16 | LoopyRegister::CoarseX as u16 | LoopyRegister::CoarseY as u16))
                                 );
                             },
-                            // Attribute table byte. See https://github.com/OneLoneCoder/olcNES/blob/master/Part%20%234%20-%20PPU%20Backgrounds/olc2C02.cpp#L802
+                            // Attribute table byte. Address: NN 1111 YYY XXX
+                            // See https://github.com/OneLoneCoder/olcNES/blob/master/Part%20%234%20-%20PPU%20Backgrounds/olc2C02.cpp#L802
+                            // and https://wiki.nesdev.com/w/index.php/PPU_scrolling#Tile_and_attribute_fetching
                             3 => {
                                 let byte = self.read_vram(
                                     cartridge,
                                     0x23C0
                                     | (self.cur_address & CtrlFlag::Nametable as u16)
-                                    | (self.cur_address & LoopyRegister::CoarseX as u16 >> 0) / 4
-                                    | (self.cur_address & LoopyRegister::CoarseY as u16 >> 5) / 4 * 8
+                                    | (((self.cur_address & LoopyRegister::CoarseX as u16) >> 2) & 0b000111) // Top 3 bits of coarse X
+                                    | (((self.cur_address & LoopyRegister::CoarseY as u16) >> 4) & 0b111000) // Top 3 bits of coarse Y
                                 );
                                 self.palette_latch = match ((self.cur_address & LoopyRegister::CoarseX as u16) % 4 / 2, ((self.cur_address & LoopyRegister::CoarseY as u16) >> 5) % 4 / 2) {
                                     (0, 0) => (byte >> 0), // Top left
@@ -198,34 +198,26 @@ impl Ppu {
                             5 => {
                                 self.pattern_latch_lo = self.read_vram(
                                     cartridge,
-                                    0x1000
-                                    * ((self.ctrl as u16 & CtrlFlag::Background as u16) >> 4)
-                                    + (self.pattern_tile_id as u16 * 16)
-                                    + ((self.cur_address & LoopyRegister::FineY as u16) >> 12)
-                                    + 0
+                                    if (self.ctrl & CtrlFlag::Background as u8) > 0 { 0x1000 } else { 0 }
+                                    | (self.pattern_tile_id as u16 * 16)
+                                    | ((self.cur_address & LoopyRegister::FineY as u16) >> 12)
                                 );
                             },
                             // Pattern table tile high byte
                             7 => {
                                 self.pattern_latch_hi = self.read_vram(
                                     cartridge,
-                                    0x1000
-                                    * ((self.ctrl as u16 & CtrlFlag::Background as u16) >> 4)
-                                    + (self.pattern_tile_id as u16 * 16)
-                                    + ((self.cur_address & LoopyRegister::FineY as u16) >> 12)
+                                    if (self.ctrl & CtrlFlag::Background as u8) > 0 { 0x1000 } else { 0 }
+                                    | (self.pattern_tile_id as u16 * 16)
+                                    | ((self.cur_address & LoopyRegister::FineY as u16) >> 12)
                                     + 8
                                 );
                             },
                             _ => {},
                         }
 
-                        // Pre-render. Clear VBlank and Sprite 0 hit bits
-                        if self.dot == 1 && self.scanline == 261 {
-                            self.status &= !(StatusFlag::VBlank as u8 | StatusFlag::Hit as u8);
-                        }
-
                         // Draw pixel on visible scanlines
-                        if self.dot <= 256 && self.scanline != 261 && (self.ctrl & CtrlFlag::Background as u8) > 0 {
+                        if self.dot <= 256 && self.scanline != 261 && (self.mask & MaskFlag::Background as u8) > 0 {
                             let (hi, lo) = ((self.pattern_shift_hi >> 8) as u8 >> (7 - self.scroll_x_fine), (self.pattern_shift_lo >> 8) as u8 >> (7 - self.scroll_x_fine));
                             let pixel = hi << 1 | lo;
                             
@@ -239,24 +231,29 @@ impl Ppu {
                             self.framebuffer[4 * n .. 4 * n + 4].copy_from_slice(&[r, g, b, 255]);
                         }
 
+                        // Pre-render. Clear VBlank and Sprite 0 hit bits
+                        if self.dot == 1 && self.scanline == 261 {
+                            self.status &= !(StatusFlag::VBlank as u8 | StatusFlag::Hit as u8);
+                        }
+                        
                         // Vertical increment (fine because by-scanline basis)
                         if self.dot == 256 && (self.mask & MaskFlag::Background as u8) > 0 {
-                            self.cur_address += (1 << 5) as u16;
-        
-                            if (self.cur_address & LoopyRegister::FineY as u16) < 7 {
-                                // Increment coarse & fine Y
-                                self.cur_address += (1 << 5) as u16;
+                            if ((self.cur_address & LoopyRegister::FineY as u16) >> 12) < 7 {
+                                // Increment fine Y
+                                self.cur_address += (1 << 12) as u16;
                             } else {
                                 // Reset fine Y to 0
-                                self.cur_address = self.cur_address & !(LoopyRegister::FineY as u16);
-                                // debug!("v is now {:#x}", self.cur_address);
+                                self.cur_address &= !(LoopyRegister::FineY as u16);
 
-                                if (self.cur_address & LoopyRegister::CoarseY as u16) < 30 {
+                                if ((self.cur_address & LoopyRegister::CoarseY as u16) >> 5) < 29 {
                                     // Increment coarse Y
                                     self.cur_address += (1 << 5) as u16;
                                 } else {
                                     // Nametable edge, go to other vertical nametable and reset coarse Y to 0
-                                    self.cur_address = (self.cur_address & !(LoopyRegister::CoarseY as u16)) | ((self.cur_address & LoopyRegister::Nametable as u16) ^ NAMETABLE_Y_MASK);
+                                    if ((self.cur_address & LoopyRegister::CoarseY as u16) >> 5) != 31 {
+                                        self.cur_address ^= NAMETABLE_Y_MASK;
+                                    }
+                                    self.cur_address &= !(LoopyRegister::CoarseY as u16);
                                 }
                             }
                         }
@@ -268,14 +265,12 @@ impl Ppu {
                             if self.dot == 257 {
                                 let mask = LoopyRegister::CoarseX as u16 | NAMETABLE_X_MASK;
                                 self.cur_address = (self.cur_address & !mask) | (self.tmp_address & mask);
-                                // debug!("v is now {:#x}", self.cur_address);
                             }
     
                             // Load Y info from temporary address
                             if self.scanline == 261 && self.dot >= 280 && self.dot <= 304 {
                                 let mask = LoopyRegister::CoarseY as u16 | LoopyRegister::FineY as u16 | NAMETABLE_Y_MASK;
                                 self.cur_address = (self.cur_address & !mask) | (self.tmp_address & mask);
-                                // debug!("v is now {:#x}", self.cur_address);
                             }
                         }
                     },
@@ -350,7 +345,6 @@ impl Ppu {
                 }
 
                 self.cur_address += if (self.ctrl & CtrlFlag::Increment as u8) > 0 { 32 } else { 1 };
-                // debug!("v is now {:#x}", self.cur_address);
 
                 dummy
             },
@@ -385,8 +379,8 @@ impl Ppu {
             0x2005 => {
                 if self.write_latch {
                     // Y scroll
-                    self.tmp_address = (self.tmp_address & !(LoopyRegister::FineY as u16)) | (data & 0b0000_0111) as u16;
-                    self.tmp_address = (self.tmp_address & !(LoopyRegister::CoarseY as u16)) | (data >> 3) as u16;
+                    self.tmp_address = (self.tmp_address & !(LoopyRegister::FineY as u16)) | ((data as u16 & 0b0000_0111) << 12);
+                    self.tmp_address = (self.tmp_address & !(LoopyRegister::CoarseY as u16)) | ((data as u16 >> 3) << 5);
                 } else {
                     // X scroll
                     self.scroll_x_fine = data & 0b0000_0111;
@@ -401,13 +395,10 @@ impl Ppu {
                     // Low byte
                     self.tmp_address = (self.tmp_address & 0b11111111_00000000) | (data as u16);
                     self.cur_address = self.tmp_address;
-                    // debug!("v is now {:#x}", self.cur_address);
                 } else {
                     // High byte
                     self.tmp_address = (self.tmp_address & 0b00000000_11111111) | ((data as u16) << 8);
                 }
-
-                // debug!("Write address {:#x}, PPU address is now {:#x}", data, self.address);
 
                 self.write_latch = !self.write_latch;
             },
@@ -415,7 +406,6 @@ impl Ppu {
             0x2007 => {
                 self.write_vram(cartridge, self.cur_address, data);
                 self.cur_address += if (self.ctrl & CtrlFlag::Increment as u8) > 0 { 32 } else { 1 };
-                // debug!("v is now {:#x}", self.cur_address);
             },
             _ => panic!("Invalid I/O write @ {:#x}", address),
         }
@@ -467,9 +457,7 @@ impl Ppu {
      * Mirror a nametable address
      */
     pub fn mirror (&self, cartridge: &Cartridge, address: u16) -> u16 {
-        let mirroring = cartridge.get_mirroring();
-
-        match mirroring {
+        match cartridge.mirroring {
             Mirroring::Horizontal => match address {
                 0x2000 ..= 0x23FF => address,
                 0x2400 ..= 0x27FF => address - 0x400,

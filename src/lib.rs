@@ -7,10 +7,11 @@ use crate::cpu::Cpu;
 use crate::ppu::CtrlFlag;
 use crate::tilemap::Tilemap;
 
-pub mod cpu;
-pub mod ppu;
-pub mod cartridge;
 pub mod bus;
+pub mod cartridge;
+pub mod cpu;
+pub mod instruction;
+pub mod ppu;
 pub mod tilemap;
 
 // trait MemoryMap {

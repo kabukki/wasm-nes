@@ -1,4 +1,4 @@
-use crate::ppu::palette::PALETTE;
+use crate::ppu::PALETTE;
 
 pub struct Tilemap {
     pub width: usize,

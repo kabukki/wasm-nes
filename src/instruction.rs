@@ -1,7 +1,6 @@
 use log::{warn, trace};
 use crate::bus::Bus;
-use crate::cpu::{Cpu, StatusFlag};
-use crate::cpu::interrupt::Interrupt;
+use crate::cpu::{Cpu, StatusFlag, Interrupt};
 
 type InstructionHandler = fn (&mut Cpu, Operand, &mut Bus);
 

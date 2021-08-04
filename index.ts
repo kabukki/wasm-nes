@@ -61,7 +61,7 @@ export class Emulator {
     }
 
     cycle () {
-        return this.vm.cycle();
+        return this.vm.frame();
     }
     
     display () {
@@ -76,7 +76,9 @@ export class Emulator {
                 this.vm.get_nametable(2),
                 this.vm.get_nametable(3),
             ],
-            nametables_ram: this.vm.get_nametable_ram(),
+            ram: this.vm.get_ram(),
+            ram_nametables: this.vm.get_nametable_ram(),
+            ram_cartridge: this.vm.get_cartridge_ram(),
             patternTables: this.vm.get_pattern_tables(),
             palettes: this.vm.get_palettes(),
             palette: this.vm.get_palette(),

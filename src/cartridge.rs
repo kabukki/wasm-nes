@@ -32,10 +32,9 @@ pub enum Mirroring {
 }
 
 pub struct Cartridge {
-    sram: [u8; 2048],
-    prg_rom: Vec<u8>,
-    chr_rom: Vec<u8>,
-    // ram: Vec<u8>,
+    pub sram: [u8; 2048],
+    pub prg_rom: Vec<u8>,
+    pub chr_rom: Vec<u8>,
     pub mirroring: Mirroring,
     // pub mapper: dyn Mapper
 }
@@ -61,7 +60,7 @@ impl Cartridge {
             (false, true) => Mirroring::Horizontal,
         };
 
-        debug!("PRG-ROM banks: {}\nCHR-ROM banks: {}\nMapper: {}\nRAM size: {}\nHas trainer ? {}\nMirroring: {:?}", chr_rom_banks, prg_rom_banks, mapper, ram, trainer, mirroring);
+        debug!("PRG-ROM banks: {}\nCHR-ROM banks: {}\nMapper: {}\nRAM size: {}\nHas trainer ? {}\nMirroring: {:?}", prg_rom_banks, chr_rom_banks, mapper, ram, trainer, mirroring);
 
         let mut cartridge = Cartridge {
             sram: [0; 2048],
@@ -97,7 +96,7 @@ impl Cartridge {
     }
 
     pub fn read_chr (&self, address: u16) -> u8 {
-        // trace!("Read CHR @ {:#x} -> {:#x}", address, self.chr_rom[address as usize]);
+        debug!("Read CHR @ {:#x} -> :#x", address);
         self.chr_rom[address as usize]
     }
 
@@ -115,7 +114,7 @@ impl Cartridge {
     pub fn write (&mut self, address: u16, data: u8) {
         match address {
             0x6000 ..= 0x7FFF => {
-                self.sram[address as usize - 0x4020] = data;
+                self.sram[address as usize - 0x6000] = data;
             },
             0x8000 ..= 0xFFFF => {
                 self.prg_rom[address as usize % 0x4000] = data; // should be handled by mapper if 1 or 2 banks

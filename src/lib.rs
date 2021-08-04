@@ -43,10 +43,20 @@ impl Nes {
         self.cpu.reset();
     }
 
-    pub fn cycle (&mut self) -> usize {
+    /**
+     * Cycle once
+     */
+    pub fn cycle (&mut self) {
+        self.cpu.cycle(&mut self.bus);
+        self.cycles += 1;
+    }
+
+    /**
+     * Cycle until frame is rendered
+     */
+    pub fn frame (&mut self) -> usize {
         let frame = self.bus.ppu.frame;
 
-        // Cycle until frame is rendered
         while frame == self.bus.ppu.frame {
             if self.cycles % 3 == 0 {
                 self.cpu.cycle(&mut self.bus);
@@ -114,10 +124,6 @@ impl Nes {
         Clamped(map.buffer)
     }
 
-    pub fn get_nametable_ram (&self) -> Vec<u8> {
-        self.bus.ppu.nametables.to_vec()
-    }
-
     /**
      * Get the contents of the CHR-ROM pattern tables.
      * Pattern tables contain background graphics (right) and sprite graphics (left)
@@ -170,9 +176,17 @@ impl Nes {
         Clamped(map.buffer)
     }
 
-    // pub fn get_ram (&self) -> Vec<u8> {
-    //     self.bus.wram.to_vec()
-    // }
+    pub fn get_ram (&self) -> Vec<u8> {
+        self.bus.wram.to_vec()
+    }
+
+    pub fn get_nametable_ram (&self) -> Vec<u8> {
+        self.bus.ppu.nametables.to_vec()
+    }
+
+    pub fn get_cartridge_ram (&self) -> Vec<u8> {
+        self.bus.cartridge.as_ref().unwrap().sram.to_vec()
+    }
 }
 
 impl Default for Nes {

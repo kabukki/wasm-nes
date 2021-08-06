@@ -50,10 +50,13 @@ fn nestest () {
     let mut bus = Bus::new();
 
     // Load program into memory
-    let rom = File::open("tests/nestest.nes").expect("Could not open rom").bytes().map(|byte| byte.unwrap()).collect();
-    let log: Vec<String> = BufReader::new(File::open("tests/nestest.log").expect("Could not open log")).lines().map(|line| line.unwrap()).collect();
+    let rom = File::open("tests/roms/cpu/nestest/nestest.nes").expect("Could not open rom").bytes().map(|byte| byte.unwrap()).collect();
+    let log: Vec<String> = BufReader::new(File::open("tests/roms/cpu/nestest/nestest.log").expect("Could not open log")).lines().map(|line| line.unwrap()).collect();
     
     bus.load(&rom);
+    cpu.reset();
+    cpu.cycle_full(&mut bus);
+    cpu.pc = 0xC000;
 
     for n in 0..log.len() {
         let state = State::from_str(&log[n]);

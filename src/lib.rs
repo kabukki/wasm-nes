@@ -71,21 +71,6 @@ impl Nes {
     }
 
     pub fn get_framebuffer (&self) -> Clamped<Vec<u8>> {
-        // let buffer32 = &self.bus.ppu.framebuffer;
-        // let mut buffer8: Vec<u8> = Vec::with_capacity(buffer32.len() * 4);
-        
-        // for n in buffer32.iter() {
-        //     buffer8.extend_from_slice(&n.to_be_bytes());
-        // }
-
-        // Clamped(buffer8)
-
-        // Clamped(
-        //     unsafe {
-        //         self.bus.ppu.framebuffer.align_to::<u8>().1.to_vec()
-        //     }
-        // )
-
         Clamped(self.bus.ppu.framebuffer.to_vec())
     }
 

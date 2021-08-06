@@ -178,7 +178,6 @@ impl Instruction {
         }
 
         (self.handler)(cpu, operand, bus);
-
         self.cycles
     }
 }
@@ -199,7 +198,7 @@ pub const INSTRUCTIONS: [Instruction; 256] = [
     Instruction { opcode: 0x0C, name: "NOP", mode: AddressingMode::Absolute,    cycles: 4, handler: nop,            illegal: true,      extra_on_page_cross: false  },
     Instruction { opcode: 0x0D, name: "ORA", mode: AddressingMode::Absolute,    cycles: 4, handler: ora,            illegal: false,     extra_on_page_cross: false  },
     Instruction { opcode: 0x0E, name: "ASL", mode: AddressingMode::Absolute,    cycles: 6, handler: asl,            illegal: false,     extra_on_page_cross: false  },
-    Instruction { opcode: 0x0F, name: "SLO", mode: AddressingMode::Absolute,    cycles: 6, handler: unimplemented,  illegal: false,     extra_on_page_cross: false  },
+    Instruction { opcode: 0x0F, name: "SLO", mode: AddressingMode::Absolute,    cycles: 6, handler: unimplemented,  illegal: true,      extra_on_page_cross: false  },
 
     Instruction { opcode: 0x10, name: "BPL", mode: AddressingMode::Relative,    cycles: 2, handler: bpl,            illegal: false,     extra_on_page_cross: false  },
     Instruction { opcode: 0x11, name: "ORA", mode: AddressingMode::IndirectY,   cycles: 5, handler: ora,            illegal: false,     extra_on_page_cross: true   },
@@ -277,7 +276,7 @@ pub const INSTRUCTIONS: [Instruction; 256] = [
     Instruction { opcode: 0x55, name: "EOR", mode: AddressingMode::ZeroPageX,   cycles: 4, handler: eor,            illegal: false,     extra_on_page_cross: false  },
     Instruction { opcode: 0x56, name: "LSR", mode: AddressingMode::ZeroPageX,   cycles: 6, handler: lsr,            illegal: false,     extra_on_page_cross: false  },
     Instruction { opcode: 0x57, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true,      extra_on_page_cross: false  },
-    Instruction { opcode: 0x58, name: "CLI", mode: AddressingMode::Implied,     cycles: 2, handler: unimplemented,  illegal: false,     extra_on_page_cross: false  },
+    Instruction { opcode: 0x58, name: "CLI", mode: AddressingMode::Implied,     cycles: 2, handler: cli,            illegal: false,     extra_on_page_cross: false  },
     Instruction { opcode: 0x59, name: "EOR", mode: AddressingMode::AbsoluteY,   cycles: 4, handler: eor,            illegal: false,     extra_on_page_cross: true   },
     Instruction { opcode: 0x5A, name: "NOP", mode: AddressingMode::Implied,     cycles: 2, handler: nop,            illegal: true,      extra_on_page_cross: false  },
     Instruction { opcode: 0x5B, name: "", mode: AddressingMode::Implied,        cycles: 2, handler: unimplemented,  illegal: true,      extra_on_page_cross: false  },
@@ -693,6 +692,17 @@ fn clc (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
     };
 
     cpu.set_flag(StatusFlag::Carry, false);
+}
+
+/**
+ * Clear Interrupt Disable Bit
+ */
+fn cli (cpu: &mut Cpu, operand: Operand, _bus: &mut Bus) {
+    if operand != Operand::None {
+        panic!("Invalid addressing mode");
+    };
+
+    cpu.set_flag(StatusFlag::DisableInterrupt, false);
 }
 
 /**

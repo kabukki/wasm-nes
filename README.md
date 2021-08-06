@@ -13,6 +13,60 @@ A **NES** emulator written in Rust compiled to WebAssemly for usage on the web.
 - Cartridge [mappers](https://wiki.nesdev.com/w/index.php/Mapper) ❌
     - *Mappers are not supported yet, only `NROM` games can run.*
 
+### Well-known tests
+
+Based on https://wiki.nesdev.com/w/index.php/Emulator_tests
+
+#### CPU
+
+| Test                  | Status    |
+|-----------------------|-----------|
+| `branch_timing_tests` | Passed ✅ |
+| `cpu_dummy_reads`     | TBD ❓    |
+| `cpu_dummy_writes`    | TBD ❓    |
+| `cpu_exec_space`      | TBD ❓    |
+| `cpu_flag_concurrency`| TBD ❓    |
+| `cpu_interrupts_v2`   | TBD ❓    |
+| `cpu_reset`           | TBD ❓    |
+| `cpu_timing_test6`    | TBD ❓    |
+| `instr_misc`          | Passed ✅ |
+| `instr_test_v5`       | Passed ✅ |
+| `nestest`             | Passed ✅ |
+| `ram_retain`          | TBD ❓    |
+
+#### PPU
+
+| Test                              | Status    |
+|-----------------------------------|-----------|
+| `blargg_ppu_tests_2005.09.15b`    | TBD ❓    |
+| `nmi_sync`                        | TBD ❓    |
+| `ntsc_torture`                    | TBD ❓    |
+| `oam_read`                        | TBD ❓    |
+| `oam_stress`                      | TBD ❓    |
+| `oamtest3`                        | TBD ❓    |
+| `ppu_open_bus`                    | TBD ❓    |
+| `ppu_read_buffer`                 | TBD ❓    |
+| `ppu_sprite_hit`                  | TBD ❓    |
+| `ppu_sprite_overflow`             | TBD ❓    |
+| `ppu_vbl_nmi`                     | TBD ❓    |
+| `sprdma_and_dmc_dma`              | TBD ❓    |
+| `tvpassfail`                      | TBD ❓    |
+
+#### APU
+
+| Test                  | Status    |
+|-----------------------|-----------|
+
+#### Mappers
+
+| Test                  | Status    |
+|-----------------------|-----------|
+
+#### Inputs
+
+| Test                  | Status    |
+|-----------------------|-----------|
+
 ## Development
 
 ### Toolchain
@@ -78,14 +132,15 @@ init().then(() => {
 
 ### ROMs & Tests
 
+- http://wiki.nesdev.com/w/index.php/Emulator_tests
 - https://github.com/christopherpow/nes-test-roms
 - https://github.com/koute/pinky/tree/master/mos6502/roms
 - https://github.com/koute/pinky/tree/master/nes-testsuite/roms
 - https://github.com/Klaus2m5/6502_65C02_functional_tests
-- http://wiki.nesdev.com/w/index.php/Emulator_tests
 - https://www.qmtpro.com/~nes/
     - https://www.qmtpro.com/~nes/misc
     - https://www.qmtpro.com/~nes/misc/nestest.txt
+- https://github.com/bbbradsmith/nes-audio-tests
 
 ### Videos & talks
 

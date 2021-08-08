@@ -62,8 +62,8 @@ impl Cartridge {
         let ram = if header[8] == 0 { 1 } else { header[8] as usize } * 0x8000;
         let mirroring = match (header[6] & ControlFlag1::FourScreen as u8 != 0, header[6] & ControlFlag1::Vertical as u8 != 0) {
             (true, _) => Mirroring::FourScreen,
-            (false, false) => Mirroring::Vertical,
-            (false, true) => Mirroring::Horizontal,
+            (false, false) => Mirroring::Horizontal,
+            (false, true) => Mirroring::Vertical,
         };
 
         debug!("PRG banks: {}\nCHR banks: {}\nMapper: {}\nRAM size: {}\nHas trainer ? {}\nMirroring: {:?}", prg_banks, chr_banks, mapper, ram, trainer, mirroring);

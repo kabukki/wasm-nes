@@ -118,6 +118,7 @@ init().then(() => {
 
 - https://www.masswerk.at/6502/6502_instruction_set.html (contains errors for instruction timing)
 - http://www.obelisk.me.uk/6502/reference.html
+- https://www.nesdev.com/6502_cpu.txt
 
 ### Examples & tutorials
 

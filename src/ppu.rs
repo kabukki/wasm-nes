@@ -163,8 +163,8 @@ impl Ppu {
                                 self.pattern_shift_hi = (self.pattern_shift_hi & 0b11111111_00000000) | self.pattern_latch_hi as u16;
                                 self.pattern_shift_lo = (self.pattern_shift_lo & 0b11111111_00000000) | self.pattern_latch_lo as u16;
                                 // Load next palette into the shifters
-                                self.palette_shift_hi = (self.palette_shift_hi & 0b11111111_00000000) | if self.palette_latch & 0b10 as u8 != 0 { 0b11111111 } else { 0b00000000 };
-                                self.palette_shift_lo = (self.palette_shift_lo & 0b11111111_00000000) | if self.palette_latch & 0b01 as u8 != 0 { 0b11111111 } else { 0b00000000 };
+                                self.palette_shift_hi = (self.palette_shift_hi & 0b11111111_00000000) | if (self.palette_latch & 0b10 as u8) != 0 { 0b11111111 } else { 0b00000000 };
+                                self.palette_shift_lo = (self.palette_shift_lo & 0b11111111_00000000) | if (self.palette_latch & 0b01 as u8) != 0 { 0b11111111 } else { 0b00000000 };
 
                                 self.pattern_tile_id = self.read_vram(
                                     cartridge,
@@ -216,10 +216,10 @@ impl Ppu {
                         // Draw pixel on visible scanlines
                         if self.dot <= 256 && self.scanline != 261 && (self.mask & MaskFlag::Background as u8) > 0 {
                             let (hi, lo) = ((self.pattern_shift_hi >> 8) as u8 >> (7 - self.scroll_x_fine), (self.pattern_shift_lo >> 8) as u8 >> (7 - self.scroll_x_fine));
-                            let pixel = hi << 1 | lo;
+                            let pixel = (hi & 1) << 1 | (lo & 1);
                             
                             let (hi, lo) = ((self.palette_shift_hi >> 8) as u8 >> (7 - self.scroll_x_fine), (self.palette_shift_lo >> 8) as u8 >> (7 - self.scroll_x_fine));
-                            let palette = hi << 1 | lo;
+                            let palette = (hi & 1) << 1 | (lo & 1);
                             
                             let color = self.palettes[4 * palette as usize + pixel as usize];
                             
@@ -353,7 +353,7 @@ impl Ppu {
      * Write to registers
      * https://wiki.nesdev.com/w/index.php/PPU_scrolling
      */
-    pub fn write (&mut self, cartridge: &Cartridge, address: u16, data: u8) {
+    pub fn write (&mut self, cartridge: &mut Cartridge, address: u16, data: u8) {
         match (address % 8) + 0x2000 {
             // PPUCTRL
             0x2000 => {
@@ -424,7 +424,7 @@ impl Ppu {
                 self.nametables[self.mirror(cartridge, address) as usize - 0x2000]
             },
             // Palette
-            0x3F00 ..= 0x3FFF => self.palettes[(address as usize - 0x3F00) % 0x20],
+            0x3F00 ..= 0x3FFF => self.palettes[address as usize % 0x20],
             // 0x4000 ..= 0xFFFF => self.read(nes, address - 0x4000),
             _ => panic!("Invalid read @ {:#x}", address),
         }
@@ -434,8 +434,12 @@ impl Ppu {
      * Write to memory
      * https://wiki.nesdev.com/w/index.php/PPU_memory_map
      */
-    fn write_vram (&mut self, cartridge: &Cartridge, address: u16, data: u8) {
+    fn write_vram (&mut self, cartridge: &mut Cartridge, address: u16, data: u8) {
         match address {
+            // Pattern tables
+            0x0000 ..= 0x1FFF => {
+                cartridge.write_chr(address, data);
+            },
             // Name tables
             0x2000 ..= 0x3EFF => {
                 // info!("Write NT {:#x} (idx {:#x}) <- {:#x}", address, self.mirror(cartridge, address) as usize - 0x2000, data);
@@ -444,7 +448,7 @@ impl Ppu {
             // Palettes
             0x3F00 ..= 0x3FFF => {
                 // info!("Write Palette {:#x} <- {:#x}", address, data);
-                self.palettes[(address as usize - 0x3F00) % 0x20] = data;
+                self.palettes[address as usize % 0x20] = data;
             },
             _ => panic!("Invalid write @ {:#x}", address),
         }
@@ -452,6 +456,7 @@ impl Ppu {
 
     /**
      * Mirror a nametable address
+     * https://wiki.nesdev.com/w/index.php/Mirroring
      */
     pub fn mirror (&self, cartridge: &Cartridge, address: u16) -> u16 {
         match cartridge.mirroring {
@@ -460,14 +465,14 @@ impl Ppu {
                 0x2400 ..= 0x27FF => address - 0x400,
                 0x2800 ..= 0x2BFF => address - 0x400,
                 0x2C00 ..= 0x2FFF => address - 0x800,
-                _ => self.mirror(cartridge, address % 0x3000 + 0x2000),
+                _ => self.mirror(cartridge, address % 0x1000 + 0x2000),
             },
             Mirroring::Vertical => match address {
                 0x2000 ..= 0x23FF => address,
                 0x2400 ..= 0x27FF => address,
                 0x2800 ..= 0x2BFF => address - 0x800,
                 0x2C00 ..= 0x2FFF => address - 0x800,
-                _ => self.mirror(cartridge, address % 0x3000 + 0x2000),        
+                _ => self.mirror(cartridge, address % 0x1000 + 0x2000),        
             },
             Mirroring::FourScreen => unimplemented!("Four-screen mirroring not implemented"),
         }

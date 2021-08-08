@@ -79,7 +79,7 @@ impl Nes {
      */
     pub fn get_nametable (&mut self, nth: u16) -> Clamped<Vec<u8>> {
         let cartridge = self.bus.cartridge.as_ref().unwrap();
-        let start_address = self.bus.ppu.mirror(cartridge, 0x2000 + nth * 0x400);
+        let start_address = 0x2000 + nth * 0x400;
         let mut map = Tilemap::new(32, 30);
 
         for n in 0 .. 960 {
@@ -118,14 +118,14 @@ impl Nes {
     pub fn get_pattern_tables (&self) -> Clamped<Vec<u8>> {
         let cartridge = self.bus.cartridge.as_ref().unwrap();
         let mut map = Tilemap::new(16, 32);
-        let (bg_palette, fg_palette) = (&self.bus.ppu.palettes[..4], &self.bus.ppu.palettes[16..20]);
+        let palette = &self.bus.ppu.palettes[..4];
     
         for n in 0..512 {
             let x = n % 16;
             let y = n / 16;
 
             let tile = cartridge.get_tile(n);
-            map.write_tile(x, y, tile.as_slice(), &(if n >= 256 { bg_palette } else { fg_palette }));
+            map.write_tile(x, y, tile.as_slice(), palette);
         }
     
         Clamped(map.buffer)

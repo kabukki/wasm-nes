@@ -88,14 +88,14 @@ pub struct Cpu {
 impl Cpu {
     pub fn new () -> Cpu {
         Cpu {
-            pc: 0xC000,
-            sp: 0xFD,
+            pc: 0,
+            sp: 0,
             a: 0,
             x: 0,
             y: 0,
-            status: (StatusFlag::Unused as u8 | StatusFlag::DisableInterrupt as u8),
+            status: StatusFlag::Unused as u8,
             cycles: 0,
-            cycles_total: 7,
+            cycles_total: 0,
             interrupt: None,
         }
     }
@@ -110,9 +110,8 @@ impl Cpu {
                 self.interrupt = None;
             } else {
                 let instruction = &INSTRUCTIONS[bus.read(self.pc) as usize];
-                // debug!("{:#?}", instruction);
                 self.pc += 1;
-    
+
                 let cycles = instruction.execute(self, bus);
                 self.cycles += cycles as usize;
             }
@@ -161,23 +160,29 @@ impl Cpu {
     pub fn interrupt (&mut self, interrupt: Interrupt, bus: &mut Bus) {
         // info!("INTERRUPT {:?}", interrupt);
 
-        if self.get_flag(StatusFlag::DisableInterrupt) && interrupt == Interrupt::IRQ {
-            warn!("Attempted to IRQ but was disabled");
-            return;
-        }
+        match interrupt {
+            Interrupt::NMI | Interrupt::IRQ => {
+                if self.get_flag(StatusFlag::DisableInterrupt) && interrupt == Interrupt::IRQ {
+                    warn!("Attempted to IRQ but was disabled");
+                    return;
+                }
 
-        if interrupt != Interrupt::RESET {
-            let (hi, lo) = ((self.pc >> 8) as u8, self.pc as u8);
-            self.push_stack(bus, hi);
-            self.push_stack(bus, lo);
-    
-            self.push_stack(bus, self.status | (StatusFlag::Unused as u8));
-            self.set_flag(StatusFlag::DisableInterrupt, true);
-        }
+                let (hi, lo) = ((self.pc >> 8) as u8, self.pc as u8);
+                self.push_stack(bus, hi);
+                self.push_stack(bus, lo);
+                self.push_stack(bus, self.status | (StatusFlag::Unused as u8));
+                self.set_flag(StatusFlag::DisableInterrupt, true);
+                self.cycles = 7;
+            },
+            Interrupt::RESET => {
+                self.sp = self.sp.wrapping_sub(3);
+                self.set_flag(StatusFlag::DisableInterrupt, true);
+                self.cycles = 7;
+            },
+        };
 
         self.pc = (bus.read(interrupt as u16 + 1) as u16) << 8 | bus.read(interrupt as u16) as u16;
         // info!("PC now at {:x}", self.pc);
-        self.cycles = 6;
     }
 
     pub fn interrupt_request (&mut self, interrupt: Interrupt) {

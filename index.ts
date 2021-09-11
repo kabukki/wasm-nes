@@ -15,18 +15,17 @@ interface Options {
     frameRate: number;
     debugRate: number;
     onError?: (err: Error) => void;
-    onCycle?: (frame: number) => void;
     onDebug?: (info: any) => void;
-    onDisplay?: (nametables: Uint8ClampedArray[]) => void;
+    onDisplay?: (framebuffer: Uint8ClampedArray) => void;
 }
 
 export class Emulator {
     private vm: Nes;
-    private intervals: ReturnType<typeof setInterval>[];
+    private callback: FrameRequestCallback;
 
     constructor () {
         this.vm = Nes.new();
-        this.intervals = [];
+        this.callback = null;
     }
 
     load (rom: Uint8Array) {
@@ -34,30 +33,36 @@ export class Emulator {
     }
 
     start ({
-        clockRate = 1000 / 5369,
-        frameRate = 1000 / 30,
-        debugRate = 1000 / 1,
         onError,
-        onCycle,
         onDebug,
         onDisplay,
     }: Options) {
-        this.intervals = [
-            [this.cycle.bind(this), onCycle, clockRate],
-            [this.display.bind(this), onDisplay, frameRate],
-            [this.debug.bind(this), onDebug, debugRate],
-        ].map(([fn, callback, interval]) => setInterval(() => {
+        let last;
+        let fps;
+        
+        this.callback = (timestamp) => {
             try {
-                callback(fn());
+                const elapsed = (timestamp - last) / 1000;
+                const frame = this.vm.frame();
+                
+                fps = Math.round(1 / elapsed);
+                last = timestamp;
+
+                onDisplay(this.vm.get_framebuffer());
+                onDebug({ frame, fps });
+        
+                requestAnimationFrame(this.callback);
             } catch (err) {
-                this.stop();
                 onError?.(err);
+                this.callback = null;
             }
-        }, interval));
+        };
+      
+        requestAnimationFrame(this.callback);
     }
 
     stop () {
-        this.intervals.forEach(window.clearInterval);
+        this.callback = null;
     }
 
     cycle () {

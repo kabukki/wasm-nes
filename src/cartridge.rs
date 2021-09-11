@@ -120,7 +120,7 @@ impl Cartridge {
                 self.sram[address as usize - 0x6000]
             },
             0x8000 ..= 0xFFFF => {
-                self.prg[address as usize % 0x4000] // should be handled by mapper if 1 or 2 banks
+                self.prg[(address as usize - 0x8000) % self.prg.len()] // should be handled by mapper if 1 or 2 banks
             },
             _ => panic!("Invalid cartridge read {:#x}", address),
         }

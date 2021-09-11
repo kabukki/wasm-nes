@@ -26,9 +26,9 @@ Based on https://wiki.nesdev.com/w/index.php/Emulator_tests
 | `cpu_dummy_writes`    | TBD ❓    |
 | `cpu_exec_space`      | TBD ❓    |
 | `cpu_flag_concurrency`| TBD ❓    |
-| `cpu_interrupts_v2`   | TBD ❓    |
+| `cpu_interrupts_v2`   | Failed ❌ (APU missing)   |
 | `cpu_reset`           | TBD ❓    |
-| `cpu_timing_test6`    | TBD ❓    |
+| `cpu_timing_test6`    | Passed ✅ |
 | `instr_misc`          | Passed ✅ |
 | `instr_test_v5`       | Passed ✅ |
 | `nestest`             | Passed ✅ |
@@ -130,6 +130,7 @@ init().then(() => {
 - https://bugzmanov.github.io/nes_ebook
 - http://emudev.de/
 - https://austinmorlan.com/posts/nes_rendering_overview/
+- https://wiki.nesdev.com/w/index.php/The_frame_and_NMIs
 
 ### ROMs & Tests
 

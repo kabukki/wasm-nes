@@ -59,17 +59,13 @@ impl Bus {
         let cartridge = self.cartridge.as_ref().unwrap();
 
         match address {
-            MEMORY_RAM_START ..= MEMORY_RAM_END => self.wram[usize::from(address - MEMORY_RAM_START) % 0x800],
-            MEMORY_IO_START ..= MEMORY_IO_END => {
-                // debug!("I/O READ {:#x}", address);
-                match address {
-                    0x2002 ..= 0x2007 => self.ppu.read(cartridge, address),
-                    0x4016 => 0, // Controller 1
-                    0x4017 => 0, // Controller 2
-                    _ => panic!("Invalid I/O read {:#x}", address),
-                }
-            },
-            MEMORY_CARTRIDGE_START ..= MEMORY_CARTRIDGE_END => cartridge.read(address),
+            0x0000 ..= 0x1FFF => self.wram[usize::from(address - MEMORY_RAM_START) % 0x800],
+            0x2000 ..= 0x3FFF => self.ppu.read(cartridge, address),
+            0x4000 ..= 0x4015 => unimplemented!("APU not implemented"),
+            0x4016 => 0, // Controller 1
+            0x4017 => 0, // Controller 2
+            0x4018 ..= 0x401F => panic!("Disabled functionality"),
+            0x4020 ..= 0xFFFF => cartridge.read(address),
         }
     }
 
@@ -77,20 +73,19 @@ impl Bus {
         let cartridge = self.cartridge.as_mut().unwrap();
 
         match address {
-            MEMORY_RAM_START ..= MEMORY_RAM_END => self.wram[usize::from(address - MEMORY_RAM_START) % 0x800] = data,
-            MEMORY_IO_START ..= MEMORY_IO_END => {
-                // trace!("I/O WRITE {:#x} {}", address, data);
-                match address {
-                    0x2000 ..= 0x3FFF => { self.ppu.write(cartridge, address, data); }
-                    0x4000 ..= 0x4013 => {}, // APU
-                    0x4014 => {}, // OAM DMA
-                    0x4015 => {}, // APU
-                    0x4016 => {}, // Controllers
-                    0x4017 => {}, // APU
-                    _ => panic!("Invalid I/O write {:#x}", address),
-                }
+            0x0000 ..= 0x1FFF => {
+                self.wram[usize::from(address - MEMORY_RAM_START) % 0x800] = data;
             },
-            MEMORY_CARTRIDGE_START ..= MEMORY_CARTRIDGE_END => {
+            0x2000 ..= 0x3FFF => {
+                self.ppu.write(cartridge, address, data);
+            }
+            0x4000 ..= 0x4013 => {}, // APU
+            0x4014 => {}, // OAM DMA
+            0x4015 => {}, // APU
+            0x4016 => {}, // Controllers
+            0x4017 => {}, // APU
+            0x4018 ..= 0x401F => panic!("Disabled functionality"),
+            0x4020 ..= 0xFFFF => {
                 cartridge.write(address, data);
             },
         };

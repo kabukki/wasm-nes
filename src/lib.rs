@@ -59,12 +59,12 @@ impl Nes {
         let frame = self.bus.ppu.frame;
 
         while frame == self.bus.ppu.frame {
-            if self.cycles % 3 == 0 {
-                self.cpu.cycle(&mut self.bus);
-            }
+            self.cpu.cycle(&mut self.bus);
+            self.bus.ppu.cycle(&self.bus.cartridge.as_ref().unwrap(), &mut self.cpu);
+            self.bus.ppu.cycle(&self.bus.cartridge.as_ref().unwrap(), &mut self.cpu);
             self.bus.ppu.cycle(&self.bus.cartridge.as_ref().unwrap(), &mut self.cpu);
             // info!("Scanline {}, Dot {}", self.bus.ppu.scanline, self.bus.ppu.dot);
-            self.cycles += 1;
+            self.cycles += 3;
         }
 
         frame + 1

@@ -221,7 +221,7 @@ impl Ppu {
                             let (hi, lo) = ((self.palette_shift_hi >> 8) as u8 >> (7 - self.scroll_x_fine), (self.palette_shift_lo >> 8) as u8 >> (7 - self.scroll_x_fine));
                             let palette = (hi & 1) << 1 | (lo & 1);
                             
-                            let color = self.palettes[4 * palette as usize + pixel as usize];
+                            let color = self.read_vram(cartridge, 0x3F00 | (4 * palette as u16 + pixel as u16));
                             
                             let n = (self.dot - 1) as usize + (256 * self.scanline as usize);
                             let (r, g, b) = PALETTE[color as usize];
@@ -424,7 +424,9 @@ impl Ppu {
                 self.nametables[self.mirror(cartridge, address) as usize - 0x2000]
             },
             // Palette
-            0x3F00 ..= 0x3FFF => self.palettes[address as usize % 0x20],
+            0x3F00 ..= 0x3FFF => {
+                self.palettes[self.mirror_palette(address) as usize - 0x3F00]
+            },
             // 0x4000 ..= 0xFFFF => self.read(nes, address - 0x4000),
             _ => panic!("Invalid read @ {:#x}", address),
         }
@@ -448,7 +450,7 @@ impl Ppu {
             // Palettes
             0x3F00 ..= 0x3FFF => {
                 // info!("Write Palette {:#x} <- {:#x}", address, data);
-                self.palettes[address as usize % 0x20] = data;
+                self.palettes[self.mirror_palette(address) as usize - 0x3F00] = data;
             },
             _ => panic!("Invalid write @ {:#x}", address),
         }
@@ -476,6 +478,16 @@ impl Ppu {
             },
             Mirroring::FourScreen => unimplemented!("Four-screen mirroring not implemented"),
         }
+    }
+
+    /**
+     * https://wiki.nesdev.com/w/index.php/PPU_palettes
+     */
+    pub fn mirror_palette (&self, address: u16) -> u16 {
+        return match address % 4 {
+            0 => address % 0x10,
+            _ => address % 0x20,
+        } + 0x3F00;
     }
 
     // fn read_oam (&self, memory: &Memory) -> [u8; 256] {
@@ -509,3 +521,19 @@ pub const PALETTE: [(u8, u8, u8); 64] = [
     (0xFF, 0xEF, 0xA6), (0xFF, 0xF7, 0x9C), (0xD7, 0xE8, 0x95), (0xA6, 0xED, 0xAF), (0xA2, 0xF2, 0xDA),
     (0x99, 0xFF, 0xFC), (0xDD, 0xDD, 0xDD), (0x11, 0x11, 0x11), (0x11, 0x11, 0x11),
 ];
+
+
+#[test]
+fn palette () {
+    let ppu = Ppu::new();
+
+    assert_eq!(ppu.mirror_palette(0x3F00), 0x3F00);
+    assert_eq!(ppu.mirror_palette(0x3F04), 0x3F04);
+    assert_eq!(ppu.mirror_palette(0x3F08), 0x3F08);
+    assert_eq!(ppu.mirror_palette(0x3F0C), 0x3F0C);
+    assert_eq!(ppu.mirror_palette(0x3F10), 0x3F00);
+    assert_eq!(ppu.mirror_palette(0x3F14), 0x3F04);
+    assert_eq!(ppu.mirror_palette(0x3F18), 0x3F08);
+    assert_eq!(ppu.mirror_palette(0x3F1C), 0x3F0C);
+    assert_eq!(ppu.mirror_palette(0x3F20), 0x3F00);
+}

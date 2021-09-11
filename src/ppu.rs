@@ -7,12 +7,11 @@
  * 
  * https://wiki.nesdev.com/w/index.php/PPU_frame_timing
  * https://wiki.nesdev.com/w/index.php/PPU_pattern_tables
- * https://www.reddit.com/r/EmuDev/comments/evu3u2/what_does_the_nes_ppu_actually_do/
  * http://wiki.nesdev.com/w/index.php/Mirroring
  * http://wiki.nesdev.com/w/index.php/PPU_nametables
  */
 
-use log::{info, debug};
+use log::warn;
 use crate::cpu::{Cpu, Interrupt};
 use crate::cartridge::{Cartridge, Mirroring};
 
@@ -334,9 +333,9 @@ impl Ppu {
             0x2007 => {
                 let mut dummy = self.read_buffer;
 
-                self.read_buffer = cartridge.read_chr(self.cur_address);
+                self.read_buffer = self.read_vram(cartridge, self.cur_address);
 
-                // Palette read
+                // Palette reads are not buffered
                 if self.cur_address >= 0x3F00 {
                     dummy = self.read_buffer;
                 }
@@ -361,7 +360,13 @@ impl Ppu {
                 self.tmp_address = (self.tmp_address & !(LoopyRegister::Nametable as u16)) | ((self.ctrl as u16 & CtrlFlag::Nametable as u16) << 10);
             },
             // PPUMASK
-            0x2001 => { self.mask = data; },
+            0x2001 => {
+                self.mask = data;
+            },
+            // PPUSTATUS
+            0x2002 => {
+                warn!("Ignored invalid write @ 0x2002");
+            },
             // OAMADDR
             0x2003 => {
                 // debug!("Write OAMADDR");
@@ -528,6 +533,9 @@ fn palette () {
     let ppu = Ppu::new();
 
     assert_eq!(ppu.mirror_palette(0x3F00), 0x3F00);
+    assert_eq!(ppu.mirror_palette(0x3F01), 0x3F01);
+    assert_eq!(ppu.mirror_palette(0x3F02), 0x3F02);
+    assert_eq!(ppu.mirror_palette(0x3F03), 0x3F03);
     assert_eq!(ppu.mirror_palette(0x3F04), 0x3F04);
     assert_eq!(ppu.mirror_palette(0x3F08), 0x3F08);
     assert_eq!(ppu.mirror_palette(0x3F0C), 0x3F0C);

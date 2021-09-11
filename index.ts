@@ -51,7 +51,9 @@ export class Emulator {
                 onDisplay(this.vm.get_framebuffer());
                 onDebug({ frame, fps });
         
-                requestAnimationFrame(this.callback);
+                if (this.callback) {
+                    requestAnimationFrame(this.callback);
+                }
             } catch (err) {
                 onError?.(err);
                 this.callback = null;

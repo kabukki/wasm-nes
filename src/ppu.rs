@@ -1,5 +1,5 @@
 /**
- * 1 frame = 262 scanlines (1 pre-render, 240 visible, 20 vblank, 1 post-render).
+ * 1 frame = 262 scanlines (1 pre-render, 240 visible, 1 post-render, 20 vblank).
  * 1 scanline = 341 PPU clock cycles (dots)
  * 1 PPU cycle = 1/3 CPU cycle = 1 pixel
  * 1 VBlank = 20 scanlines
@@ -178,7 +178,7 @@ impl Ppu {
                                 let byte = self.read_vram(
                                     cartridge,
                                     0x23C0
-                                    | (self.cur_address & CtrlFlag::Nametable as u16)
+                                    | (self.cur_address & LoopyRegister::Nametable as u16)
                                     | (((self.cur_address & LoopyRegister::CoarseX as u16) >> 2) & 0b000111) // Top 3 bits of coarse X
                                     | (((self.cur_address & LoopyRegister::CoarseY as u16) >> 4) & 0b111000) // Top 3 bits of coarse Y
                                 );

@@ -11,21 +11,19 @@ import init, { Nes, set_panic_hook, set_log } from './pkg';
  */
 
 interface Options {
-    clockRate: number;
-    frameRate: number;
     debugRate: number;
+    canvas: HTMLCanvasElement;
     onError?: (err: Error) => void;
     onDebug?: (info: any) => void;
-    onDisplay?: (framebuffer: Uint8ClampedArray) => void;
 }
 
 export class Emulator {
     private vm: Nes;
-    private callback: FrameRequestCallback;
+    private rafHandle: ReturnType<typeof requestAnimationFrame>;
+    private debugHandle: ReturnType<typeof setInterval>;
 
     constructor () {
         this.vm = Nes.new();
-        this.callback = null;
     }
 
     load (rom: Uint8Array) {
@@ -33,46 +31,48 @@ export class Emulator {
     }
 
     start ({
+        canvas,
         onError,
         onDebug,
-        onDisplay,
     }: Options) {
-        let last;
-        let fps;
+        const context = canvas.getContext('2d', { alpha: false });
+        let frame = 0, frames = 0, last = performance.now(), fps = 0;
         
-        this.callback = (timestamp) => {
+        const rafCallback = (timestamp) => {
             try {
-                const elapsed = (timestamp - last) / 1000;
-                const frame = this.vm.frame();
-                
-                fps = Math.round(1 / elapsed);
-                last = timestamp;
-
-                onDisplay(this.vm.get_framebuffer());
-                onDebug({ frame, fps });
+                const elapsed = timestamp - last;
+                frames++;
         
-                if (this.callback) {
-                    requestAnimationFrame(this.callback);
+                if (elapsed > 1000) {
+                    fps = Math.round(frames * 1000 / elapsed);
+                    last = timestamp;
+                    frames = 0;
                 }
+        
+                frame = this.vm.frame();
+                context.putImageData(new ImageData(this.vm.get_framebuffer(), 32 * 8, 30 * 8), 0, 0);
+
+                this.rafHandle = requestAnimationFrame(rafCallback);
             } catch (err) {
                 onError?.(err);
-                this.callback = null;
+                this.stop();
             }
         };
+
+        this.debugHandle = setInterval(() => {
+            onDebug({
+                fps: fps,
+                frame,
+                ram: this.vm.get_ram(),
+            });
+        }, 500);
       
-        requestAnimationFrame(this.callback);
+        this.rafHandle = requestAnimationFrame(rafCallback);
     }
 
     stop () {
-        this.callback = null;
-    }
-
-    cycle () {
-        return this.vm.frame();
-    }
-    
-    display () {
-        return this.vm.get_framebuffer();
+        clearInterval(this.debugHandle);
+        cancelAnimationFrame(this.rafHandle);
     }
 
     debug () {

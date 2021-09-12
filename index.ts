@@ -1,3 +1,5 @@
+import GameStats from 'game-stats';
+
 import init, { Nes, set_panic_hook, set_log } from './pkg';
 
 /**
@@ -21,9 +23,11 @@ export class Emulator {
     private vm: Nes;
     private rafHandle: ReturnType<typeof requestAnimationFrame>;
     private debugHandle: ReturnType<typeof setInterval>;
+    private stats: GameStats;
 
     constructor () {
         this.vm = Nes.new();
+        this.stats = new GameStats();
     }
 
     load (rom: Uint8Array) {
@@ -36,23 +40,13 @@ export class Emulator {
         onDebug,
     }: Options) {
         const context = canvas.getContext('2d', { alpha: false });
-        let frame = 0, frames = 0, last = performance.now(), fps = 0;
         
         const rafCallback = (timestamp) => {
             try {
-                const elapsed = timestamp - last;
-                frames++;
-        
-                if (elapsed > 1000) {
-                    fps = Math.round(frames * 1000 / elapsed);
-                    last = timestamp;
-                    frames = 0;
-                }
-        
-                frame = this.vm.frame();
+                this.vm.frame();
                 context.putImageData(new ImageData(this.vm.get_framebuffer(), 32 * 8, 30 * 8), 0, 0);
-
                 this.rafHandle = requestAnimationFrame(rafCallback);
+                this.stats.record(timestamp);
             } catch (err) {
                 onError?.(err);
                 this.stop();
@@ -61,8 +55,7 @@ export class Emulator {
 
         this.debugHandle = setInterval(() => {
             onDebug({
-                fps: fps,
-                frame,
+                stats: this.stats.stats(),
                 ram: this.vm.get_ram(),
             });
         }, 500);

@@ -55,7 +55,7 @@ impl Nes {
     /**
      * Cycle until frame is rendered
      */
-    pub fn frame (&mut self) -> usize {
+    pub fn frame (&mut self) {
         let frame = self.bus.ppu.frame;
 
         while frame == self.bus.ppu.frame {
@@ -66,8 +66,6 @@ impl Nes {
             // info!("Scanline {}, Dot {}", self.bus.ppu.scanline, self.bus.ppu.dot);
             self.cycles += 3;
         }
-
-        frame + 1
     }
 
     pub fn get_framebuffer (&self) -> Clamped<Vec<u8>> {

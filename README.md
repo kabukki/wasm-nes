@@ -124,7 +124,6 @@ init().then(() => {
 
 - https://github.com/gianlucag/mos6502
 - https://github.com/GarettCooper/gc_nes_emulator
-- https://github.com/daniel5151/ANESE
 - https://skilldrick.github.io/easy6502/
 - https://famicom.party/book
 - https://bugzmanov.github.io/nes_ebook
@@ -147,10 +146,9 @@ init().then(() => {
 ### Videos & talks
 
 - https://www.youtube.com/watch?v=fWqBmmPQP40
-- https://www.youtube.com/watch?v=DMcx9DAHrZQ
-- https://www.youtube.com/watch?v=-THeUXqR3zY
+- https://www.youtube.com/playlist?list=PLrOv9FMX8xJHqMvSGB_9G9nZZ_4IgteYf
 
-### Writing assembly for the platform
+### Assembly
 
 - https://timcheeseman.com/nesdev
 - https://www.cc65.org/doc/ld65-5.html

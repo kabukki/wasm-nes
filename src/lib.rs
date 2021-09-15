@@ -48,7 +48,31 @@ impl Nes {
      * Cycle once
      */
     pub fn cycle (&mut self) {
-        self.cpu.cycle(&mut self.bus);
+        if self.cycles % 3 == 0 {
+            let mut dma = self.bus.dma;
+
+            match dma {
+                Some (ref mut status) => {
+                    if status.wait {
+                        if self.cycles % 2 == 1 {
+                            status.wait = false;
+                        }
+                    } else {
+                        let address = (status.page as usize) << 8;
+                        self.bus.ppu.write_oam_dma(&self.bus.wram[address .. address + 256]);
+                        self.cpu.cycles = 512;
+                        dma = None;
+                    }
+
+                    self.bus.dma = dma;
+                },    
+                None => {
+                    self.cpu.cycle(&mut self.bus);
+                },    
+            }
+        }
+
+        self.bus.ppu.cycle(&self.bus.cartridge.as_ref().unwrap(), &mut self.cpu);
         self.cycles += 1;
     }
 
@@ -59,12 +83,7 @@ impl Nes {
         let frame = self.bus.ppu.frame;
 
         while frame == self.bus.ppu.frame {
-            self.cpu.cycle(&mut self.bus);
-            self.bus.ppu.cycle(&self.bus.cartridge.as_ref().unwrap(), &mut self.cpu);
-            self.bus.ppu.cycle(&self.bus.cartridge.as_ref().unwrap(), &mut self.cpu);
-            self.bus.ppu.cycle(&self.bus.cartridge.as_ref().unwrap(), &mut self.cpu);
-            // info!("Scanline {}, Dot {}", self.bus.ppu.scanline, self.bus.ppu.dot);
-            self.cycles += 3;
+            self.cycle();
         }
     }
 
@@ -170,6 +189,10 @@ impl Nes {
 
     pub fn get_cartridge_ram (&self) -> Vec<u8> {
         self.bus.cartridge.as_ref().unwrap().sram.to_vec()
+    }
+
+    pub fn get_oam (&self) -> Vec<u8> {
+        self.bus.ppu.oam.to_vec()
     }
 }
 

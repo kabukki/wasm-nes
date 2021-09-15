@@ -1,4 +1,4 @@
-// use log::{debug, trace};
+use log::{info};
 use crate::ppu::Ppu;
 use crate::cartridge::Cartridge;
 
@@ -33,6 +33,12 @@ pub const MEMORY_CARTRIDGE_END: u16             = 0xFFFF;
 pub const PAGE_SIZE: usize                      = 0x0100;
 pub const CARTRIDGE_BANK_SIZE: usize            = 0x4000;
 
+#[derive(Debug, Clone, Copy)]
+pub struct Dma {
+    pub page: u8,
+    pub wait: bool,
+}
+
 /**
  * Memory map for the CPU
  */
@@ -40,6 +46,7 @@ pub struct Bus {
     pub wram: [u8; 0x800], // 2 KiB, mirrored (max 11 bits)
     pub ppu: Ppu,
     pub cartridge: Option<Cartridge>,
+    pub dma: Option<Dma>,
 }
 
 impl Bus {
@@ -48,6 +55,7 @@ impl Bus {
             wram: [0; 0x800],
             ppu: Ppu::new(),
             cartridge: None,
+            dma: None,
         }
     }
 
@@ -59,7 +67,7 @@ impl Bus {
         let cartridge = self.cartridge.as_ref().unwrap();
 
         match address {
-            0x0000 ..= 0x1FFF => self.wram[usize::from(address - MEMORY_RAM_START) % 0x800],
+            0x0000 ..= 0x1FFF => self.wram[address as usize % 0x800],
             0x2000 ..= 0x3FFF => self.ppu.read(cartridge, address),
             0x4000 ..= 0x4015 => unimplemented!("APU not implemented"),
             0x4016 => 0, // Controller 1
@@ -74,13 +82,18 @@ impl Bus {
 
         match address {
             0x0000 ..= 0x1FFF => {
-                self.wram[usize::from(address - MEMORY_RAM_START) % 0x800] = data;
+                self.wram[address as usize % 0x800] = data;
             },
             0x2000 ..= 0x3FFF => {
                 self.ppu.write(cartridge, address, data);
             }
             0x4000 ..= 0x4013 => {}, // APU
-            0x4014 => {}, // OAM DMA
+            0x4014 => {
+                self.dma = Some(Dma {
+                    page: data,
+                    wait: true,
+                });
+            },
             0x4015 => {}, // APU
             0x4016 => {}, // Controllers
             0x4017 => {}, // APU

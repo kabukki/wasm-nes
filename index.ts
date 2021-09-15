@@ -19,15 +19,23 @@ interface Options {
     onDebug?: (info: any) => void;
 }
 
+export enum Status {
+    Idle,
+    Running,
+    Crashed,
+}
+
 export class Emulator {
     private vm: Nes;
     private rafHandle: ReturnType<typeof requestAnimationFrame>;
     private debugHandle: ReturnType<typeof setInterval>;
     private stats: GameStats;
+    public status: Status;
 
     constructor () {
         this.vm = Nes.new();
         this.stats = new GameStats();
+        this.status = Status.Idle;
     }
 
     load (rom: Uint8Array) {
@@ -40,7 +48,6 @@ export class Emulator {
         onDebug,
     }: Options) {
         const context = canvas.getContext('2d', { alpha: false });
-        
         const rafCallback = (timestamp) => {
             try {
                 this.vm.frame();
@@ -49,7 +56,7 @@ export class Emulator {
                 this.stats.record(timestamp);
             } catch (err) {
                 onError?.(err);
-                this.stop();
+                this.stop(err);
             }
         };
 
@@ -57,15 +64,17 @@ export class Emulator {
             onDebug({
                 stats: this.stats.stats(),
                 ram: this.vm.get_ram(),
+                palettes: this.vm.get_palettes(),
             });
         }, 500);
-      
         this.rafHandle = requestAnimationFrame(rafCallback);
+        this.status = Status.Running;
     }
 
-    stop () {
+    stop (error?: Error) {
         clearInterval(this.debugHandle);
         cancelAnimationFrame(this.rafHandle);
+        this.status = error ? Status.Crashed : Status.Idle;
     }
 
     debug () {

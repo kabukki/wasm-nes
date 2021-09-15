@@ -1,10 +1,11 @@
+/**
+ * iNES format http://wiki.nesdev.com/w/index.php/INES
+ */
+
 use wasm_bindgen::prelude::*;
 use log::debug;
 use std::io::prelude::*;
 use std::io::Cursor;
-
-// iNES format
-// http://wiki.nesdev.com/w/index.php/INES
 
 pub const PRG_BANK_SIZE: usize = 16 * 1024; // 16 KiB
 pub const CHR_BANK_SIZE: usize = 8 * 1024; // 8 KiB
@@ -104,7 +105,6 @@ impl Cartridge {
 
     pub fn read_chr (&self, address: u16) -> u8 {
         // debug!("Read CHR @ {:#x}", address);
-        // self.chr_rom[address as usize]
         self.chr[address as usize]
     }
 
@@ -120,7 +120,8 @@ impl Cartridge {
                 self.sram[address as usize - 0x6000]
             },
             0x8000 ..= 0xFFFF => {
-                self.prg[(address as usize - 0x8000) % self.prg.len()] // should be handled by mapper if 1 or 2 banks
+                let len = self.prg.len();
+                self.prg[(address as usize - 0x8000) % len] // should be handled by mapper if 1 or 2 banks
             },
             _ => panic!("Invalid cartridge read {:#x}", address),
         }
@@ -134,7 +135,8 @@ impl Cartridge {
                 self.sram[address as usize - 0x6000] = data;
             },
             0x8000 ..= 0xFFFF => {
-                self.prg[address as usize % 0x4000] = data; // should be handled by mapper if 1 or 2 banks
+                let len = self.prg.len();
+                self.prg[(address as usize - 0x8000) % len] = data; // should be handled by mapper if 1 or 2 banks
             },
             _ => panic!("Invalid cartridge write {:#x}", address),
         }

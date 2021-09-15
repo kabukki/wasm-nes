@@ -20,7 +20,7 @@ pub enum CtrlFlag {
     Increment       = 0b0000_0100,  // VRAM address increment per read or write: -32 or +1
     Sprite          = 0b0000_1000,  // Sprite pattern table address for 8x8 sprites
     Background      = 0b0001_0000,  // Background pattern table address
-    Height          = 0b0010_0000,  // Sprite size (8x16 or 8x8)
+    SpriteHeight    = 0b0010_0000,  // Sprite size (8x16 or 8x8)
     Master          = 0b0100_0000,  // PPU master/slave select
     Nmi             = 0b1000_0000,  // Enable NMI on V-Blank
 }
@@ -30,14 +30,14 @@ pub enum MaskFlag {
     BackgroundLeft  = 0b0000_0010,  // Enable background on leftmost 8 pixels of screen
     SpritesLeft     = 0b0000_0100,  // Enable sprites on leftmost 8 pixels of screen
     Background      = 0b0000_1000,  // Enable background
-    Sprites         = 0b0001_0000,  // Enable sprites
+    Foreground      = 0b0001_0000,  // Enable sprites
     Red             = 0b0010_0000,  // Emphasize red
     Green           = 0b0100_0000,  // Emphasize green
     Blue            = 0b1000_0000,  // Emphasize blue
 }
 
 pub enum StatusFlag {
-    Overflow        = 0b0010_0000,  // Sprite overflow
+    SpriteOverflow  = 0b0010_0000,  // Sprite overflow
     Hit             = 0b0100_0000,  // Sprite 0 hit
     VBlank          = 0b1000_0000,  // Vertical blank
 }
@@ -50,6 +50,14 @@ pub enum LoopyRegister {
     Unused          = 0b10000000_00000000,
 }
 
+pub enum SpriteAttribute {
+    Palette         = 0b0000_0011,
+    Unused          = 0b0001_1100,
+    Priority        = 0b0010_0000,
+    FlipHorizontal  = 0b0100_0000,
+    FlipVertical    = 0b1000_0000,
+}
+
 pub const NAMETABLE_X_MASK: u16 = 0b00000100_00000000;
 pub const NAMETABLE_Y_MASK: u16 = 0b00001000_00000000;
 
@@ -57,8 +65,6 @@ pub struct Ppu {
     pub ctrl: u8,
     pub mask: u8,
     pub status: u8,
-    pub oam_address: u8,
-    pub oam_data: u8,
     pub oam_dma: u8,
     pub data: u8,
     pub nametables: [u8; 0x800], // Nametables. 2x1KiB (2 screen states)
@@ -66,9 +72,9 @@ pub struct Ppu {
     pub dot: u16,
     pub scanline: u16,
     pub framebuffer: Box<[u8; 256 * 240 * 4]>, // 512x480 -> 256x240 (32x30 = 960 tiles)
+    pub frame: usize,
     write_latch: bool,
     read_buffer: u8,
-    pub frame: usize,
     
     // Background
     pub cur_address: u16, // loopy_v
@@ -81,12 +87,19 @@ pub struct Ppu {
     palette_latch: u8,
     palette_shift_hi: u16,
     palette_shift_lo: u16,
-
-    // Scrolling
     scroll_x_fine: u8, // Fine X offset (0-7)
-
+    
     // Sprites
     pub oam: [u8; 256], // Sprite RAM: 64 * 4 bytes (Y, tile #, attribute, X)
+    oam_index: u8,
+    oam_index_overflowed: bool,
+    oam_secondary: [u8; 32], // Sprites to be rendered on next scanline (max 8): 8 * 4 bytes
+    oam_secondary_index: u8,
+    oam_address: u8,
+    sprite_shift_hi: [u8; 8],
+    sprite_shift_lo: [u8; 8],
+    sprite_attributes: [u8; 8],
+    sprite_positions: [u8; 8],
 }
 
 impl Ppu {
@@ -95,19 +108,16 @@ impl Ppu {
             ctrl: 0b0000_0000,
             mask: 0,
             status: StatusFlag::VBlank as u8,
-            oam_address: 0,
-            oam_data: 0,
             oam_dma: 0,
             data: 0,
             nametables: [0; 0x800],
             palettes: [0; 0x20],
-            oam: [0; 256],
             dot: 0,
             scanline: 261, // start @ pre-render
             framebuffer: Box::new([0; 256 * 240 * 4]),
+            frame: 0,
             write_latch: false,
             read_buffer: 0,
-            frame: 0,
             cur_address: 0,
             tmp_address: 0,
             pattern_tile_id: 0,
@@ -119,12 +129,23 @@ impl Ppu {
             palette_shift_hi: 0,
             palette_shift_lo: 0,
             scroll_x_fine: 0,
+            oam: [0; 256],
+            oam_index: 0,
+            oam_index_overflowed: false,
+            oam_secondary: [0; 32],
+            oam_secondary_index: 0,
+            oam_address: 0,
+            sprite_shift_hi: [0; 8],
+            sprite_shift_lo: [0; 8],
+            sprite_attributes: [0; 8],
+            sprite_positions: [0; 8],        
         }
     }
 
     /**
      * https://wiki.nesdev.com/w/index.php/PPU_rendering
      * https://wiki.nesdev.com/w/index.php/PPU_scrolling
+     * https://wiki.nesdev.com/w/index.php/PPU_OAM
      * https://wiki.nesdev.com/w/images/d/d1/Ntsc_timing.png
      */
     pub fn cycle (&mut self, cartridge: &Cartridge, cpu: &mut Cpu) {
@@ -133,7 +154,6 @@ impl Ppu {
                 // PPU busy fetching data, so PPU memory should not be accessed during this time (unless rendering is turned off - MaskFlags)
                 match self.dot {
                     0 => {}, // Idle
-                    // Draw pixels for scanline
                     1 ..= 256 | 321 ..= 336 => {
                         if (self.mask & MaskFlag::Background as u8) > 0 {
                             self.pattern_shift_hi <<= 1;
@@ -172,8 +192,9 @@ impl Ppu {
                                 );
                             },
                             // Attribute table byte. Address: NN 1111 YYY XXX
+                            // https://wiki.nesdev.com/w/index.php/PPU_attribute_tables
                             // See https://github.com/OneLoneCoder/olcNES/blob/master/Part%20%234%20-%20PPU%20Backgrounds/olc2C02.cpp#L802
-                            // and https://wiki.nesdev.com/w/index.php/PPU_scrolling#Tile_and_attribute_fetching
+                            // and https://wiki.nesdev.com/w/index.php/PPU_scrolling#Tile_and_attribute_fetching for the computed address
                             3 => {
                                 let byte = self.read_vram(
                                     cartridge,
@@ -212,26 +233,117 @@ impl Ppu {
                             _ => {},
                         }
 
-                        // Draw pixel on visible scanlines
-                        if self.dot <= 256 && self.scanline != 261 && (self.mask & MaskFlag::Background as u8) > 0 {
-                            let (hi, lo) = ((self.pattern_shift_hi >> 8) as u8 >> (7 - self.scroll_x_fine), (self.pattern_shift_lo >> 8) as u8 >> (7 - self.scroll_x_fine));
-                            let pixel = (hi & 1) << 1 | (lo & 1);
-                            
-                            let (hi, lo) = ((self.palette_shift_hi >> 8) as u8 >> (7 - self.scroll_x_fine), (self.palette_shift_lo >> 8) as u8 >> (7 - self.scroll_x_fine));
-                            let palette = (hi & 1) << 1 | (lo & 1);
-                            
-                            let color = self.read_vram(cartridge, 0x3F00 | (4 * palette as u16 + pixel as u16));
-                            
-                            let n = (self.dot - 1) as usize + (256 * self.scanline as usize);
-                            let (r, g, b) = PALETTE[color as usize];
-                            self.framebuffer[4 * n .. 4 * n + 4].copy_from_slice(&[r, g, b, 255]);
+                        // Visible scanlines
+                        if self.scanline != 261 {
+                            // Prepare secondary OAM for next scanline https://wiki.nesdev.com/w/index.php/PPU_sprite_evaluation
+                            match self.dot {
+                                // Clear secondary OAM
+                                1 ..= 64 => {
+                                    if self.dot == 1 {
+                                        self.oam_secondary_index = 0;
+                                    } else if self.dot % 2 == 0 {
+                                        self.oam_secondary[self.oam_secondary_index as usize] = self.read(cartridge, 0x2004);
+                                        self.oam_secondary_index += 1;
+                                    }
+                                },
+                                // Perform sprite evaluation
+                                65 ..= 256 => {
+                                    if self.dot == 65 {
+                                        self.oam_index = 0;
+                                        self.oam_secondary_index = 0;
+                                        self.oam_index_overflowed = false;
+                                    } else if self.dot % 2 == 0 {
+                                        let sprite_y = self.oam[self.oam_index as usize] as u16;
+                                        let sprite_height = if (self.ctrl & CtrlFlag::SpriteHeight as u8) > 0 { 16 } else { 8 };
+
+                                        // Sprite overlaps with current scanline
+                                        if !self.oam_index_overflowed && (self.scanline >= sprite_y) && (sprite_y + sprite_height > self.scanline) {
+                                            if (self.oam_secondary_index / 4) < 8 {
+                                                self.oam_secondary[self.oam_secondary_index as usize .. self.oam_secondary_index as usize + 4]
+                                                    .copy_from_slice(&self.oam[self.oam_index as usize .. self.oam_index as usize + 4]);
+                                                self.oam_secondary_index += 4;
+                                            } else if (self.status & StatusFlag::SpriteOverflow as u8) == 0 {
+                                                self.status |= StatusFlag::SpriteOverflow as u8;
+                                            } else {
+                                                // Sprite overflow bug
+                                                let (index, overflow) = self.oam_index.overflowing_add(1);
+                                                self.oam_index = index;
+                                                self.oam_index_overflowed = self.oam_index_overflowed || overflow;
+                                            }
+                                        }
+
+                                        let (index, overflow) = self.oam_index.overflowing_add(4);
+                                        self.oam_index = index;
+                                        self.oam_index_overflowed = self.oam_index_overflowed || overflow;
+                                    }
+                                },
+                                _ => {},
+                            }
+
+                            // Draw pixel on visible dots
+                            if self.dot <= 256 {
+                                let (mut bg_pixel, mut bg_palette) = (0, 0);
+                                let (mut fg_pixel, mut fg_palette, mut fg_priority) = (0, 0, false);
+                                let mut sprite_number: Option<usize> = None;
+
+                                if (self.mask & MaskFlag::Background as u8) > 0 {
+                                    let (hi, lo) = ((self.pattern_shift_hi >> 8) as u8 >> (7 - self.scroll_x_fine), (self.pattern_shift_lo >> 8) as u8 >> (7 - self.scroll_x_fine));
+                                    bg_pixel = (hi & 1) << 1 | (lo & 1);
+                                    
+                                    let (hi, lo) = ((self.palette_shift_hi >> 8) as u8 >> (7 - self.scroll_x_fine), (self.palette_shift_lo >> 8) as u8 >> (7 - self.scroll_x_fine));
+                                    bg_palette = (hi & 1) << 1 | (lo & 1);
+                                }
+
+                                if (self.mask & MaskFlag::Foreground as u8) > 0 {
+                                    for index in 0..8 {
+                                        if self.sprite_positions[index] > 0 {
+                                            self.sprite_positions[index] -= 1;
+                                        } else {
+                                            self.sprite_shift_hi[index] <<= 1;
+                                            self.sprite_shift_lo[index] <<= 1;
+                                        }
+
+                                        // Loop will end at first non-transparent sprite pixel
+                                        if self.sprite_positions[index] == 0 && fg_pixel == 0 {
+                                            let (hi, lo) = (self.sprite_shift_hi[index] >> 7, self.sprite_shift_lo[index] >> 7);
+                                            fg_pixel = hi << 1 | lo;
+                                            fg_palette = (self.sprite_attributes[index] & SpriteAttribute::Palette as u8) + 4;
+                                            fg_priority = (self.sprite_attributes[index] & SpriteAttribute::Priority as u8) == 0;
+                                            sprite_number = Some(index);
+                                        }
+                                    }
+                                }
+
+                                let (pixel, palette) = match (bg_pixel, fg_pixel) {
+                                    (0, 0) => (0, 0),
+                                    (0, _) => (fg_pixel, fg_palette),
+                                    (_, 0) => (bg_pixel, bg_palette),
+                                    (_, _) => {
+                                        // Sprite zero hit
+                                        if self.dot != 255 && (self.dot >= 8 || (self.mask & (MaskFlag::BackgroundLeft as u8) > 0 || self.mask & (MaskFlag::SpritesLeft as u8) > 0)) && sprite_number.is_some() && sprite_number.unwrap() == 0 {
+                                            self.status |= StatusFlag::Hit as u8;
+                                        }
+
+                                        if fg_priority {
+                                            (fg_pixel, fg_palette)
+                                        } else {
+                                            (bg_pixel, bg_palette)
+                                        }
+                                    },
+                                };
+
+                                let color = self.read_vram(cartridge, 0x3F00 + 4 * palette as u16 + pixel as u16);
+                                let (r, g, b) = PALETTE[color as usize];
+                                let n = (self.dot as usize - 1) + (256 * self.scanline as usize);
+                                self.framebuffer[4 * n .. 4 * n + 4].copy_from_slice(&[r, g, b, 255]);
+                            }
+                        } else if self.dot == 1 {
+                            // Pre-render, end of VBlank
+                            self.status &= !(StatusFlag::VBlank as u8 | StatusFlag::Hit as u8 | StatusFlag::SpriteOverflow as u8);
+                            self.sprite_shift_lo = [0; 8];
+                            self.sprite_shift_hi = [0; 8];
                         }
 
-                        // Pre-render. Clear VBlank and Sprite 0 hit bits
-                        if self.dot == 1 && self.scanline == 261 {
-                            self.status &= !(StatusFlag::VBlank as u8 | StatusFlag::Hit as u8);
-                        }
-                        
                         // Vertical increment (fine because by-scanline basis)
                         if self.dot == 256 && (self.mask & MaskFlag::Background as u8) > 0 {
                             if ((self.cur_address & LoopyRegister::FineY as u16) >> 12) < 7 {
@@ -254,15 +366,60 @@ impl Ppu {
                             }
                         }
                     },
-                    // Sprite
                     257 ..= 320 => {
+                        // Sprite fetches. Gargabe bytes are ignored
+                        match (self.dot - 257) % 8 {
+                            // Sprite tile low byte
+                            4 => {
+                                let index = ((self.dot - 257) / 8) as usize;
+                                let sprite_y = self.oam_secondary[index * 4] as u16;
+
+                                if sprite_y != 0xFF {
+                                    self.sprite_attributes[index] = self.oam_secondary[index * 4 + 2];
+                                    self.sprite_positions[index] = self.oam_secondary[index * 4 + 3];
+                                    self.sprite_shift_lo[index] = self.read_vram(
+                                        cartridge,
+                                        if (self.ctrl & CtrlFlag::Sprite as u8) > 0 { 0x1000 } else { 0 }
+                                        | (self.oam_secondary[index * 4 + 1] as u16 * 16)
+                                        | if (self.sprite_attributes[index] & SpriteAttribute::FlipVertical as u8) > 0 { 7 - (self.scanline - sprite_y) } else { self.scanline - sprite_y }
+                                    );
+
+                                    if (self.sprite_attributes[index] & SpriteAttribute::FlipHorizontal as u8) > 0 {
+                                        self.sprite_shift_lo[index] = self.sprite_shift_lo[index].reverse_bits();
+                                    }
+                                }
+                            },
+                            // Sprite tile high byte
+                            6 => {
+                                let index = ((self.dot - 257) / 8) as usize;
+                                let sprite_y = self.oam_secondary[index * 4] as u16;
+
+                                if sprite_y != 0xFF {
+                                    self.sprite_attributes[index] = self.oam_secondary[index * 4 + 2];
+                                    self.sprite_positions[index] = self.oam_secondary[index * 4 + 3];
+                                    self.sprite_shift_hi[index] = self.read_vram(
+                                        cartridge,
+                                        if (self.ctrl & CtrlFlag::Sprite as u8) > 0 { 0x1000 } else { 0 }
+                                        | (self.oam_secondary[index * 4 + 1] as u16 * 16)
+                                        | if (self.sprite_attributes[index] & SpriteAttribute::FlipVertical as u8) > 0 { 7 - (self.scanline - sprite_y) } else { self.scanline - sprite_y }
+                                        + 8
+                                    );
+    
+                                    if (self.sprite_attributes[index] & SpriteAttribute::FlipHorizontal as u8) > 0 {
+                                        self.sprite_shift_hi[index] = self.sprite_shift_hi[index].reverse_bits();
+                                    }
+                                }
+                            },
+                            _ => {},
+                        }
+
                         if (self.mask & MaskFlag::Background as u8) > 0 {
                             // Load X info from temporary address
                             if self.dot == 257 {
                                 let mask = LoopyRegister::CoarseX as u16 | NAMETABLE_X_MASK;
                                 self.cur_address = (self.cur_address & !mask) | (self.tmp_address & mask);
                             }
-    
+
                             // Load Y info from temporary address
                             if self.scanline == 261 && self.dot >= 280 && self.dot <= 304 {
                                 let mask = LoopyRegister::CoarseY as u16 | LoopyRegister::FineY as u16 | NAMETABLE_Y_MASK;
@@ -276,12 +433,10 @@ impl Ppu {
                 }
             },
             240 => {}, // Post-render
-            // V-Blank and NMI
+            // V-Blank
             241 => {
                 if self.dot == 1 {
-                    // info!("Scanline 241. Setting VBlank");
                     self.status |= StatusFlag::VBlank as u8;
-                    // self.status |= StatusFlag::Hit as u8; // Test 0 sprite hit TODO REMOVE
                     // Trigger NMI if enabled
                     if self.ctrl & CtrlFlag::Nmi as u8 > 0 {
                         cpu.interrupt_request(Interrupt::NMI);
@@ -304,10 +459,10 @@ impl Ppu {
                 self.scanline = 0;
                 self.frame += 1;
 
-                // // Skip first dot on odd frames
-                // if self.frame % 2 == 1 {
-                //     self.dot += 1;
-                // }
+                // Skip first dot on odd frames
+                if self.frame % 2 == 1 {
+                    self.dot += 1;
+                }
             }            
         }
     }
@@ -315,6 +470,7 @@ impl Ppu {
     /**
      * Read registers
      * https://wiki.nesdev.com/w/index.php/PPU_scrolling
+     * https://wiki.nesdev.com/w/index.php/PPU_registers
      */
     pub fn read (&mut self, cartridge: &Cartridge, address: u16) -> u8 {
         match (address % 8) + 0x2000 {
@@ -328,7 +484,14 @@ impl Ppu {
                 status
             },
             // OAMDATA
-            0x2004 => self.oam_data,
+            0x2004 => {
+                // On visible scanline and cycles 1-64, reading OAMDATA returns 0xFF to reset the secondary OAM
+                if (self.status & StatusFlag::VBlank as u8) == 0 && self.dot >= 1 && self.dot <= 64 {
+                    0xFF
+                } else {
+                    self.oam[self.oam_address as usize]
+                }
+            },
             // PPUDATA
             0x2007 => {
                 let mut dummy = self.read_buffer;
@@ -351,6 +514,7 @@ impl Ppu {
     /**
      * Write to registers
      * https://wiki.nesdev.com/w/index.php/PPU_scrolling
+     * https://wiki.nesdev.com/w/index.php/PPU_registers
      */
     pub fn write (&mut self, cartridge: &mut Cartridge, address: u16, data: u8) {
         match (address % 8) + 0x2000 {
@@ -369,13 +533,11 @@ impl Ppu {
             },
             // OAMADDR
             0x2003 => {
-                // debug!("Write OAMADDR");
                 self.oam_address = data;
             },
             // OAMDATA
             0x2004 => {
-                // debug!("Write OAMDATA");
-                self.oam_data = data;
+                self.oam[self.oam_address as usize] = data;
             },
             // PPUSCROLL
             0x2005 => {
@@ -462,6 +624,13 @@ impl Ppu {
     }
 
     /**
+     * Copy bytes to OAM
+     */
+    pub fn write_oam_dma (&mut self, data: &[u8]) {
+        self.oam.copy_from_slice(data);
+    }
+
+    /**
      * Mirror a nametable address
      * https://wiki.nesdev.com/w/index.php/Mirroring
      */
@@ -537,11 +706,32 @@ fn palette () {
     assert_eq!(ppu.mirror_palette(0x3F02), 0x3F02);
     assert_eq!(ppu.mirror_palette(0x3F03), 0x3F03);
     assert_eq!(ppu.mirror_palette(0x3F04), 0x3F04);
+    assert_eq!(ppu.mirror_palette(0x3F05), 0x3F05);
+    assert_eq!(ppu.mirror_palette(0x3F06), 0x3F06);
+    assert_eq!(ppu.mirror_palette(0x3F07), 0x3F07);
     assert_eq!(ppu.mirror_palette(0x3F08), 0x3F08);
+    assert_eq!(ppu.mirror_palette(0x3F09), 0x3F09);
+    assert_eq!(ppu.mirror_palette(0x3F0A), 0x3F0A);
+    assert_eq!(ppu.mirror_palette(0x3F0B), 0x3F0B);
     assert_eq!(ppu.mirror_palette(0x3F0C), 0x3F0C);
+    assert_eq!(ppu.mirror_palette(0x3F0D), 0x3F0D);
+    assert_eq!(ppu.mirror_palette(0x3F0E), 0x3F0E);
+    assert_eq!(ppu.mirror_palette(0x3F0F), 0x3F0F);
     assert_eq!(ppu.mirror_palette(0x3F10), 0x3F00);
+    assert_eq!(ppu.mirror_palette(0x3F11), 0x3F11);
+    assert_eq!(ppu.mirror_palette(0x3F12), 0x3F12);
+    assert_eq!(ppu.mirror_palette(0x3F13), 0x3F13);
     assert_eq!(ppu.mirror_palette(0x3F14), 0x3F04);
+    assert_eq!(ppu.mirror_palette(0x3F15), 0x3F15);
+    assert_eq!(ppu.mirror_palette(0x3F16), 0x3F16);
+    assert_eq!(ppu.mirror_palette(0x3F17), 0x3F17);
     assert_eq!(ppu.mirror_palette(0x3F18), 0x3F08);
+    assert_eq!(ppu.mirror_palette(0x3F19), 0x3F19);
+    assert_eq!(ppu.mirror_palette(0x3F1A), 0x3F1A);
+    assert_eq!(ppu.mirror_palette(0x3F1B), 0x3F1B);
     assert_eq!(ppu.mirror_palette(0x3F1C), 0x3F0C);
-    assert_eq!(ppu.mirror_palette(0x3F20), 0x3F00);
+    assert_eq!(ppu.mirror_palette(0x3F1D), 0x3F1D);
+    assert_eq!(ppu.mirror_palette(0x3F1E), 0x3F1E);
+    assert_eq!(ppu.mirror_palette(0x3F1F), 0x3F1F);
+    // assert_eq!(ppu.mirror_palette(0x3F20), 0x3F00);
 }

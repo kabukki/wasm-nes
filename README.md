@@ -6,11 +6,11 @@ A **NES** emulator written in Rust compiled to WebAssemly for usage on the web.
 
 ## Current implementation status:
 
-- Central Processing Unit (Ricoh 2A03) ✅
-- Pixel Processing Unit 🚧
-- Audio Processing Unit ❌
-- Input devices ❌
-- Cartridge [mappers](https://wiki.nesdev.com/w/index.php/Mapper) ❌
+- ✅ Central Processing Unit (Ricoh 2A03) 
+- ✅ Pixel Processing Unit
+- ❌ Audio Processing Unit 
+- ❌ Input devices
+- ❌ Cartridge [mappers](https://wiki.nesdev.com/w/index.php/Mapper)
     - *Mappers are not supported yet, only `NROM` games can run.*
 
 ### Well-known tests

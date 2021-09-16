@@ -1,6 +1,8 @@
 extern crate console_error_panic_hook;
+extern crate wee_alloc;
 
 use wasm_bindgen::{prelude::*, Clamped};
+use wee_alloc::WeeAlloc;
 use crate::bus::Bus;
 use crate::cpu::Cpu;
 use crate::ppu::CtrlFlag;
@@ -13,6 +15,9 @@ pub mod instruction;
 pub mod ppu;
 pub mod tilemap;
 pub mod controller;
+
+#[global_allocator]
+static GLOBAL: WeeAlloc = WeeAlloc::INIT;
 
 #[wasm_bindgen]
 pub struct Nes {

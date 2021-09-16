@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["Lucien Le Roux <rshn.kabu@gmail.com>"]
 edition = "2018"
 
+# Preserve debug symbols for profiling builds
+[package.metadata.wasm-pack.profile.profiling]
+wasm-opt = ["-O", "-g"]
+
 [lib]
 name = "wasm_nes"
 crate-type = ["cdylib", "rlib"]
@@ -11,5 +15,6 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 log = "0.4"
 wasm-bindgen = "0.2.74"
+wee_alloc = "0.4.5"
 console_error_panic_hook = "0.1.6"
 console_log = { version = "0.2", features = ["color"] }

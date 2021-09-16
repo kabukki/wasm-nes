@@ -1,7 +1,6 @@
 extern crate console_error_panic_hook;
 
 use wasm_bindgen::{prelude::*, Clamped};
-use log::{info, trace};
 use crate::bus::Bus;
 use crate::cpu::Cpu;
 use crate::ppu::CtrlFlag;
@@ -13,11 +12,7 @@ pub mod cpu;
 pub mod instruction;
 pub mod ppu;
 pub mod tilemap;
-
-// trait MemoryMap {
-//     fn read (&self, a: u16) -> u8;
-//     // pub fn write (a: u16) -> u8 {}
-// }
+pub mod controller;
 
 #[wasm_bindgen]
 pub struct Nes {
@@ -85,6 +80,11 @@ impl Nes {
         while frame == self.bus.ppu.frame {
             self.cycle();
         }
+    }
+
+    pub fn update_controllers (&mut self, data: &[u8]) {
+        self.bus.controllers[0].update(data[0]);
+        self.bus.controllers[1].update(data[1]);
     }
 
     pub fn get_framebuffer (&self) -> Clamped<Vec<u8>> {

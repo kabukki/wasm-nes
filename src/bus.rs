@@ -1,6 +1,7 @@
 use log::{info};
 use crate::ppu::Ppu;
 use crate::cartridge::Cartridge;
+use crate::controller::Controller;
 
 // One page = 0xFF. Zero page is 0-0x00FF
 // stack: 0x0100 - 0x01FF (1 page)
@@ -47,6 +48,7 @@ pub struct Bus {
     pub ppu: Ppu,
     pub cartridge: Option<Cartridge>,
     pub dma: Option<Dma>,
+    pub controllers: [Controller; 2],
 }
 
 impl Bus {
@@ -56,6 +58,7 @@ impl Bus {
             ppu: Ppu::new(),
             cartridge: None,
             dma: None,
+            controllers: [Controller::new(); 2],
         }
     }
 
@@ -70,8 +73,8 @@ impl Bus {
             0x0000 ..= 0x1FFF => self.wram[address as usize % 0x800],
             0x2000 ..= 0x3FFF => self.ppu.read(cartridge, address),
             0x4000 ..= 0x4015 => unimplemented!("APU not implemented"),
-            0x4016 => 0, // Controller 1
-            0x4017 => 0, // Controller 2
+            0x4016 => self.controllers[0].read(),
+            0x4017 => self.controllers[1].read(),
             0x4018 ..= 0x401F => panic!("Disabled functionality"),
             0x4020 ..= 0xFFFF => cartridge.read(address),
         }
@@ -95,7 +98,10 @@ impl Bus {
                 });
             },
             0x4015 => {}, // APU
-            0x4016 => {}, // Controllers
+            0x4016 => {
+                self.controllers[0].write(data);
+                self.controllers[1].write(data);
+            },
             0x4017 => {}, // APU
             0x4018 ..= 0x401F => panic!("Disabled functionality"),
             0x4020 ..= 0xFFFF => {

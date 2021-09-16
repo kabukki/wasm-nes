@@ -295,7 +295,9 @@ impl Ppu {
                                 }
 
                                 if (self.mask & MaskFlag::Foreground as u8) > 0 {
-                                    for index in 0..8 {
+                                    let mut index = 0;
+
+                                    while index < 8 {
                                         if self.sprite_positions[index] > 0 {
                                             self.sprite_positions[index] -= 1;
                                         } else {
@@ -311,6 +313,8 @@ impl Ppu {
                                             fg_priority = (self.sprite_attributes[index] & SpriteAttribute::Priority as u8) == 0;
                                             sprite_number = Some(index);
                                         }
+
+                                        index += 1;
                                     }
                                 }
 

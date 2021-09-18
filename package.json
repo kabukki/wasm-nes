@@ -6,8 +6,8 @@
     "dist/*"
   ],
   "scripts": {
-    "build:wasm": "wasm-pack build -t web --profiling --scope kabukki --out-name index",
-    "build:js": "esbuild --bundle --outdir=dist --sourcemap --format=esm index.ts && tsc --emitDeclarationOnly && cp pkg/*.wasm dist",
+    "build:wasm": "wasm-pack build -t web --profiling --out-name index",
+    "build:js": "esbuild --bundle --outdir=dist --sourcemap --format=esm ./lib/index.ts && tsc --emitDeclarationOnly && cp pkg/*.wasm dist",
     "build": "npm run build:wasm && npm run build:js",
     "lint": "cargo clippy",
     "test": "cargo test",

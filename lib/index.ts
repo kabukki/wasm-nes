@@ -90,8 +90,10 @@ export class Emulator {
         this.status = error ? Status.Crashed : Status.Idle;
     }
 
-    input (input: number) {
-        this.inputs[0] = input;
+    input (index: number, input: number) {
+        if (index >= 0 && index < this.inputs.length) {
+            this.inputs[index] = input;
+        }
     }
 }
 

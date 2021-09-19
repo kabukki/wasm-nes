@@ -50,13 +50,10 @@ export class Gamepad extends Input {
 
     poll () {
         const gamepad = [...navigator.getGamepads()].filter((gamepad) => !!gamepad)[this.index];
+        const [previousValue, previousGamepad] = [this.value, this.gamepadConnected];
         
         this.reset();
-
-        if (this.gamepadConnected !== !!gamepad) {
-            this.gamepadConnected = !!gamepad;
-            this.onGamepad(this.gamepadConnected);
-        }
+        this.gamepadConnected = !!gamepad;
 
         if (gamepad) {
             // Button controls
@@ -82,7 +79,14 @@ export class Gamepad extends Input {
             }
         }
         
-        this.onUpdate(this.value);
+        if (this.value !== previousValue) {
+            this.onUpdate(this.value);
+        }
+
+        if (this.gamepadConnected !== previousGamepad) {
+            this.onGamepad(this.gamepadConnected);
+        }
+
         this.rafHandle = requestAnimationFrame(this.poll.bind(this));
     }
 

@@ -102,5 +102,3 @@ export default function () {
 }
 
 export * from './input';
-export * from './gamepad';
-export * from './keyboard';

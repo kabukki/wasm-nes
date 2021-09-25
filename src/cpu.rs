@@ -1,10 +1,11 @@
 use log::{warn, info, trace};
-use crate::bus::{Bus, MEMORY_RAM_STACK_START};
+use crate::bus::Bus;
 use crate::instruction::INSTRUCTIONS;
 
 // https://wiki.nesdev.com/w/index.php/CPU_interrupts
 
-pub const INTERRUPT_LATENCY: u8 = 7;
+pub const INTERRUPT_LATENCY: usize = 7;
+pub const MEMORY_RAM_STACK_START: u16 = 0x100;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Interrupt {
@@ -111,7 +112,6 @@ impl Cpu {
             } else {
                 let instruction = &INSTRUCTIONS[bus.read(self.pc) as usize];
                 self.pc += 1;
-
                 let cycles = instruction.execute(self, bus);
                 self.cycles += cycles as usize;
             }
@@ -172,12 +172,12 @@ impl Cpu {
                 self.push_stack(bus, lo);
                 self.push_stack(bus, self.status | (StatusFlag::Unused as u8));
                 self.set_flag(StatusFlag::DisableInterrupt, true);
-                self.cycles = 7;
+                self.cycles = INTERRUPT_LATENCY;
             },
             Interrupt::RESET => {
                 self.sp = self.sp.wrapping_sub(3);
                 self.set_flag(StatusFlag::DisableInterrupt, true);
-                self.cycles = 7;
+                self.cycles = INTERRUPT_LATENCY;
             },
         };
 

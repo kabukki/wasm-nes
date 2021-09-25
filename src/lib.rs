@@ -10,6 +10,7 @@ use crate::tilemap::Tilemap;
 
 pub mod bus;
 pub mod cartridge;
+pub mod mapper;
 pub mod cpu;
 pub mod instruction;
 pub mod ppu;
@@ -190,10 +191,6 @@ impl Nes {
 
     pub fn get_nametable_ram (&self) -> Vec<u8> {
         self.bus.ppu.nametables.to_vec()
-    }
-
-    pub fn get_cartridge_ram (&self) -> Vec<u8> {
-        self.bus.cartridge.as_ref().unwrap().sram.to_vec()
     }
 
     pub fn get_oam (&self) -> Vec<u8> {

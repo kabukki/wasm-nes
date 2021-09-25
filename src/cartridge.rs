@@ -6,6 +6,7 @@ use wasm_bindgen::prelude::*;
 use log::debug;
 use std::io::prelude::*;
 use std::io::Cursor;
+use crate::mapper::{Mapper, get_mapper};
 
 pub const PRG_BANK_SIZE: usize = 16 * 1024; // 16 KiB
 pub const CHR_BANK_SIZE: usize = 8 * 1024; // 8 KiB
@@ -38,11 +39,11 @@ pub enum ChrType {
 }
 
 pub struct Cartridge {
-    pub sram: [u8; 2048],
-    pub prg: Vec<u8>,
+    pub prg_ram: [u8; 2048],
+    pub prg_rom: Vec<u8>,
     pub chr: Vec<u8>,
     pub mirroring: Mirroring,
-    // pub mapper: dyn Mapper
+    pub mapper: Box<dyn Mapper>,
 }
 
 impl Cartridge {
@@ -70,17 +71,18 @@ impl Cartridge {
         debug!("PRG banks: {}\nCHR banks: {}\nMapper: {}\nRAM size: {}\nHas trainer ? {}\nMirroring: {:?}", prg_banks, chr_banks, mapper, ram, trainer, mirroring);
 
         let mut cartridge = Cartridge {
-            sram: [0; 2048],
-            prg: vec![0; prg_banks * PRG_BANK_SIZE],
+            prg_ram: [0; 2048],
+            prg_rom: vec![0; prg_banks * PRG_BANK_SIZE],
             chr: vec![0; std::cmp::max(chr_banks, 1) * CHR_BANK_SIZE], // No distinction between CHR ROM and RAM
             mirroring,
+            mapper: get_mapper(mapper),
         };
 
         if trainer {
             cursor.seek(std::io::SeekFrom::Current(512)).expect("Could not read trainer");
         }
 
-        cursor.read_exact(cartridge.prg.as_mut()).expect("Could not read PRG-ROM");
+        cursor.read_exact(cartridge.prg_rom.as_mut()).expect("Could not read PRG-ROM");
         if chr_type == ChrType::ROM {
             cursor.read_exact(cartridge.chr.as_mut()).expect("Could not read CHR-ROM");
         }
@@ -104,43 +106,19 @@ impl Cartridge {
     }
 
     pub fn read_chr (&self, address: u16) -> u8 {
-        // debug!("Read CHR @ {:#x}", address);
-        self.chr[address as usize]
+        self.mapper.read_chr(address, &self.chr)
     }
 
     pub fn write_chr (&mut self, address: u16, data: u8) {
-        // debug!("Read CHR @ {:#x}", address);
-        self.chr[address as usize] = data;
+        self.mapper.write_chr(address, data, &mut self.chr);
     }
 
-    // Mapper
-    pub fn read (&self, address: u16) -> u8 {
-        match address {
-            0x6000 ..= 0x7FFF => {
-                self.sram[address as usize - 0x6000]
-            },
-            0x8000 ..= 0xFFFF => {
-                let len = self.prg.len();
-                self.prg[(address as usize - 0x8000) % len] // should be handled by mapper if 1 or 2 banks
-            },
-            _ => panic!("Invalid cartridge read {:#x}", address),
-        }
+    pub fn read_prg (&self, address: u16) -> u8 {
+        self.mapper.read_prg(address, &self.prg_ram, &self.prg_rom)
     }
         
-    // Mapper
-    pub fn write (&mut self, address: u16, data: u8) {
-        println!("Write PRG @ {:#x} <- {:#x}", address, data);
-        match address {
-            0x6000 ..= 0x7FFF => {
-                self.sram[address as usize - 0x6000] = data;
-            },
-            0x8000 ..= 0xFFFF => {
-                let len = self.prg.len();
-                self.prg[(address as usize - 0x8000) % len] = data; // should be handled by mapper if 1 or 2 banks
-            },
-            _ => panic!("Invalid cartridge write {:#x}", address),
-        }
-        // trace!("Read PRG @ {:#x} -> {:#x}", address, self.prg_rom[address as usize]);
+    pub fn write_prg (&mut self, address: u16, data: u8) {
+        // println!("Write PRG @ {:#x} <- {:#x}", address, data);
+        self.mapper.write_prg(address, data, &mut self.prg_ram, &mut self.prg_rom);
     }
-
 }

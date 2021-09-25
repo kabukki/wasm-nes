@@ -99,7 +99,7 @@ pub struct Ppu {
     sprite_shift_hi: [u8; 8],
     sprite_shift_lo: [u8; 8],
     sprite_attributes: [u8; 8],
-    sprite_positions: [u8; 8],
+    sprite_offsets: [u8; 8],
 }
 
 impl Ppu {
@@ -138,7 +138,7 @@ impl Ppu {
             sprite_shift_hi: [0; 8],
             sprite_shift_lo: [0; 8],
             sprite_attributes: [0; 8],
-            sprite_positions: [0; 8],        
+            sprite_offsets: [0; 8],        
         }
     }
 
@@ -166,13 +166,14 @@ impl Ppu {
                         match self.dot % 8 {
                             // Horizontal increment (coarse because by-tile basis)
                             0 => {
-                                if (self.mask & MaskFlag::Background as u8) > 0 {
+                                if self.mask & (MaskFlag::Background as u8 | MaskFlag::Foreground as u8) > 0 {
                                     if (self.cur_address & LoopyRegister::CoarseX as u16) < 31 {
                                         // Increment coarse X
-                                        self.cur_address += (1 << 0) as u16;
+                                        self.cur_address += 1;
                                     } else {
                                         // Nametable edge, go to other horizontal nametable and reset coarse X to 0
-                                        self.cur_address = (self.cur_address & !(LoopyRegister::CoarseX as u16)) | ((self.cur_address & LoopyRegister::Nametable as u16) ^ NAMETABLE_X_MASK);
+                                        // self.cur_address = (self.cur_address & !(LoopyRegister::CoarseX as u16)) | ((self.cur_address & LoopyRegister::Nametable as u16) ^ NAMETABLE_X_MASK);
+                                        self.cur_address ^= LoopyRegister::CoarseX as u16 | NAMETABLE_X_MASK as u16;
                                     }
                                 }
                             },
@@ -297,18 +298,19 @@ impl Ppu {
                                 if (self.mask & MaskFlag::Foreground as u8) > 0 {
                                     let mut index = 0;
 
+                                    // Simple loop is more performant than range iterator
                                     while index < 8 {
-                                        if self.sprite_positions[index] > 0 {
-                                            self.sprite_positions[index] -= 1;
+                                        if self.sprite_offsets[index] > 0 {
+                                            self.sprite_offsets[index] -= 1;
                                         } else {
                                             self.sprite_shift_hi[index] <<= 1;
                                             self.sprite_shift_lo[index] <<= 1;
                                         }
 
                                         // Loop will end at first non-transparent sprite pixel
-                                        if self.sprite_positions[index] == 0 && fg_pixel == 0 {
+                                        if self.sprite_offsets[index] == 0 && fg_pixel == 0 {
                                             let (hi, lo) = (self.sprite_shift_hi[index] >> 7, self.sprite_shift_lo[index] >> 7);
-                                            fg_pixel = hi << 1 | lo;
+                                            fg_pixel = (hi << 1) | lo;
                                             fg_palette = (self.sprite_attributes[index] & SpriteAttribute::Palette as u8) + 4;
                                             fg_priority = (self.sprite_attributes[index] & SpriteAttribute::Priority as u8) == 0;
                                             sprite_number = Some(index);
@@ -324,7 +326,10 @@ impl Ppu {
                                     (_, 0) => (bg_pixel, bg_palette),
                                     (_, _) => {
                                         // Sprite zero hit
-                                        if self.dot != 255 && (self.dot >= 8 || (self.mask & (MaskFlag::BackgroundLeft as u8) > 0 || self.mask & (MaskFlag::SpritesLeft as u8) > 0)) && sprite_number.is_some() && sprite_number.unwrap() == 0 {
+                                        if self.dot != 256
+                                            && (self.dot > 8 || (self.mask & (MaskFlag::BackgroundLeft as u8 | MaskFlag::SpritesLeft as u8) > 0))
+                                            && sprite_number.is_some() && sprite_number.unwrap() == 0
+                                        {
                                             self.status |= StatusFlag::Hit as u8;
                                         }
 
@@ -371,7 +376,7 @@ impl Ppu {
                         }
                     },
                     257 ..= 320 => {
-                        // Sprite fetches. Gargabe bytes are ignored
+                        // Sprite fetches. Garbage bytes are ignored
                         match (self.dot - 257) % 8 {
                             // Sprite tile low byte
                             4 => {
@@ -380,7 +385,7 @@ impl Ppu {
 
                                 if sprite_y != 0xFF {
                                     self.sprite_attributes[index] = self.oam_secondary[index * 4 + 2];
-                                    self.sprite_positions[index] = self.oam_secondary[index * 4 + 3];
+                                    self.sprite_offsets[index] = self.oam_secondary[index * 4 + 3];
                                     self.sprite_shift_lo[index] = self.read_vram(
                                         cartridge,
                                         if (self.ctrl & CtrlFlag::Sprite as u8) > 0 { 0x1000 } else { 0 }
@@ -400,7 +405,7 @@ impl Ppu {
 
                                 if sprite_y != 0xFF {
                                     self.sprite_attributes[index] = self.oam_secondary[index * 4 + 2];
-                                    self.sprite_positions[index] = self.oam_secondary[index * 4 + 3];
+                                    self.sprite_offsets[index] = self.oam_secondary[index * 4 + 3];
                                     self.sprite_shift_hi[index] = self.read_vram(
                                         cartridge,
                                         if (self.ctrl & CtrlFlag::Sprite as u8) > 0 { 0x1000 } else { 0 }
@@ -417,7 +422,7 @@ impl Ppu {
                             _ => {},
                         }
 
-                        if (self.mask & MaskFlag::Background as u8) > 0 {
+                        if self.mask & (MaskFlag::Background as u8 | MaskFlag::Foreground as u8) > 0 {
                             // Load X info from temporary address
                             if self.dot == 257 {
                                 let mask = LoopyRegister::CoarseX as u16 | NAMETABLE_X_MASK;
@@ -441,7 +446,6 @@ impl Ppu {
             241 => {
                 if self.dot == 1 {
                     self.status |= StatusFlag::VBlank as u8;
-                    // Trigger NMI if enabled
                     if self.ctrl & CtrlFlag::Nmi as u8 > 0 {
                         cpu.interrupt_request(Interrupt::NMI);
                     }
@@ -478,6 +482,7 @@ impl Ppu {
      */
     pub fn read (&mut self, cartridge: &Cartridge, address: u16) -> u8 {
         match (address % 8) + 0x2000 {
+            0x2001 => self.mask,
             // PPUSTATUS
             0x2002 => {
                 // Residual data on bottom 5 bits
@@ -547,8 +552,8 @@ impl Ppu {
             0x2005 => {
                 if self.write_latch {
                     // Y scroll
-                    self.tmp_address = (self.tmp_address & !(LoopyRegister::FineY as u16)) | ((data as u16 & 0b0000_0111) << 12);
-                    self.tmp_address = (self.tmp_address & !(LoopyRegister::CoarseY as u16)) | ((data as u16 >> 3) << 5);
+                    self.tmp_address = (self.tmp_address & !(LoopyRegister::FineY as u16)) | ((data & 0b0000_0111) as u16) << 12;
+                    self.tmp_address = (self.tmp_address & !(LoopyRegister::CoarseY as u16)) | ((data >> 3) as u16) << 5;
                 } else {
                     // X scroll
                     self.scroll_x_fine = data & 0b0000_0111;
@@ -584,7 +589,7 @@ impl Ppu {
      * https://wiki.nesdev.com/w/index.php/PPU_memory_map
      */
     pub fn read_vram (&self, cartridge: &Cartridge, address: u16) -> u8 {
-        match address {
+        match address % 0x4000 {
             // Pattern tables in cartridge CHR ROM/RAM
             0x0000 ..= 0x1FFF => {
                 // TODO specific addressing
@@ -608,7 +613,7 @@ impl Ppu {
      * https://wiki.nesdev.com/w/index.php/PPU_memory_map
      */
     fn write_vram (&mut self, cartridge: &mut Cartridge, address: u16, data: u8) {
-        match address {
+        match address % 0x4000 {
             // Pattern tables
             0x0000 ..= 0x1FFF => {
                 cartridge.write_chr(address, data);

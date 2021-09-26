@@ -1,4 +1,4 @@
-use log::{warn, trace};
+use log::warn;
 use crate::bus::Bus;
 use crate::cpu::{Cpu, StatusFlag, Interrupt};
 

@@ -1,4 +1,4 @@
-use log::{warn, info, trace};
+use log::warn;
 use crate::bus::Bus;
 use crate::instruction::INSTRUCTIONS;
 
@@ -115,10 +115,10 @@ impl Cpu {
                 let cycles = instruction.execute(self, bus);
                 self.cycles += cycles as usize;
             }
-            
+
             // trace!("PC:{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:08b} SP:{:02X}", self.pc, self.a, self.x, self.y, self.status, self.sp);
         }
-        
+
         self.cycles -= 1;
         self.cycles_total += 1;
     }

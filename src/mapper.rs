@@ -4,7 +4,7 @@
 
 pub fn get_mapper (id: u8) -> Box<dyn Mapper> {
     let mapper = match id {
-        0 => MapperNROM {},
+        0 => Mapper000 {},
         _ => unimplemented!("Unsupported mapper"),
     };
 
@@ -21,8 +21,8 @@ pub trait Mapper {
 /**
  * https://wiki.nesdev.org/w/index.php/NROM
  */
-pub struct MapperNROM {}
-impl Mapper for MapperNROM {
+pub struct Mapper000 {}
+impl Mapper for Mapper000 {
     fn read_chr (&self, address: u16, chr: &Vec<u8>) -> u8 {
         chr[address as usize]
     }
@@ -51,6 +51,7 @@ impl Mapper for MapperNROM {
         match address {
             0x6000 ..= 0x7FFF => {
                 prg_ram[address as usize - 0x6000] = data;
+                // hook to save
             },
             _ => panic!("Invalid cartridge write {:#x}", address),
         }

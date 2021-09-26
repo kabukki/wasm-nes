@@ -1,4 +1,3 @@
-use log::{info};
 use crate::ppu::Ppu;
 use crate::cartridge::Cartridge;
 use crate::controller::Controller;

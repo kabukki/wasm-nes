@@ -69,9 +69,9 @@ export class Emulator {
                 // ram: this.vm.get_ram(),
                 // ram_nametables: this.vm.get_nametable_ram(),
                 // ram_cartridge: this.vm.get_cartridge_ram(),    
-                // patternTables: this.vm.get_pattern_tables(),
-                // palettes: this.vm.get_palettes(),
-                // palette: this.vm.get_palette(),
+                patternTables: this.vm.get_pattern_tables(),
+                palettes: this.vm.get_palettes(),
+                palette: this.vm.get_palette(),
                 // nametables: [
                 //     this.vm.get_nametable(0),
                 //     this.vm.get_nametable(1),
@@ -88,6 +88,10 @@ export class Emulator {
         clearInterval(this.debugHandle);
         cancelAnimationFrame(this.rafHandle);
         this.status = error ? Status.Crashed : Status.Idle;
+    }
+
+    reset () {
+        this.vm.reset();
     }
 
     input (index: number, input: number) {

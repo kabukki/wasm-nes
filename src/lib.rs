@@ -93,6 +93,10 @@ impl Nes {
         self.bus.controllers[1].update(data[1]);
     }
 
+    pub fn reset (&mut self) {
+        self.cpu.reset();
+    }
+
     pub fn get_framebuffer (&self) -> Clamped<Vec<u8>> {
         Clamped(self.bus.ppu.framebuffer.to_vec())
     }

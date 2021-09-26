@@ -326,7 +326,7 @@ impl Ppu {
                                     (_, 0) => (bg_pixel, bg_palette),
                                     (_, _) => {
                                         // Sprite zero hit
-                                        if self.dot != 256
+                                        if self.dot < 255
                                             && (self.dot > 8 || (self.mask & (MaskFlag::BackgroundLeft as u8 | MaskFlag::SpritesLeft as u8) > 0))
                                             && sprite_number.is_some() && sprite_number.unwrap() == 0
                                         {

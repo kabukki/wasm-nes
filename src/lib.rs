@@ -93,6 +93,9 @@ impl Nes {
         self.bus.controllers[1].update(data[1]);
     }
 
+    /**
+     * https://wiki.nesdev.org/w/index.php/Init_code
+     */
     pub fn reset (&mut self) {
         self.cpu.reset();
     }

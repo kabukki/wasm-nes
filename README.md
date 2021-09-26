@@ -41,7 +41,7 @@ Based on https://wiki.nesdev.com/w/index.php/Emulator_tests
 | `blargg_ppu_tests_2005.09.15b`    | ❌ Failed |
 | `nmi_sync`                        | ❌ Failed |
 | `ntsc_torture`                    | -         |
-| `oam_read`                        | ❌ Failed |
+| `oam_read`                        | ✅ Passed |
 | `oam_stress`                      | ❌ Failed |
 | `oamtest3`                        | ❌ Mapper missing     |
 | `ppu_open_bus`                    | ❌ Not implemented    |

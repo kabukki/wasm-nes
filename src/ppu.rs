@@ -547,6 +547,7 @@ impl Ppu {
             // OAMDATA
             0x2004 => {
                 self.oam[self.oam_address as usize] = data;
+                self.oam_address += 1;
             },
             // PPUSCROLL
             0x2005 => {

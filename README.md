@@ -10,8 +10,7 @@ A **NES** emulator written in Rust compiled to WebAssemly for usage on the web.
 - ✅ Pixel Processing Unit
 - ❌ Audio Processing Unit 
 - ✅ Input devices (keyboard & controller)
-- ❌ Cartridge [mappers](https://wiki.nesdev.com/w/index.php/Mapper)
-    - *Mappers are not supported yet, only `NROM` games can run.*
+- 🚧 Cartridge [mappers](https://wiki.nesdev.com/w/index.php/Mapper): NROM
 
 ### Well-known tests
 
@@ -142,6 +141,7 @@ init().then(() => {
     - https://www.qmtpro.com/~nes/misc
     - https://www.qmtpro.com/~nes/misc/nestest.txt
 - https://github.com/bbbradsmith/nes-audio-tests
+- http://bootgod.dyndns.org:7777/search.php?ines=1&group=groupid
 
 ### Videos & talks
 

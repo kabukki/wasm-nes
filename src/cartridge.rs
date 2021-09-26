@@ -119,6 +119,6 @@ impl Cartridge {
         
     pub fn write_prg (&mut self, address: u16, data: u8) {
         // println!("Write PRG @ {:#x} <- {:#x}", address, data);
-        self.mapper.write_prg(address, data, &mut self.prg_ram, &mut self.prg_rom);
+        self.mapper.write_prg(address, data, &mut self.prg_ram);
     }
 }

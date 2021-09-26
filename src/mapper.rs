@@ -15,7 +15,7 @@ pub trait Mapper {
     fn read_chr (&self, address: u16, chr: &Vec<u8>) -> u8;
     fn write_chr (&mut self, address: u16, data: u8, chr: &mut Vec<u8>);
     fn read_prg (&self, address: u16, prg_ram: &[u8], prg_rom: &Vec<u8>) -> u8;
-    fn write_prg (&mut self, address: u16, data: u8, prg_ram: &mut [u8], prg_rom: &mut Vec<u8>);
+    fn write_prg (&mut self, address: u16, data: u8, prg_ram: &mut [u8]);
 }
 
 /**
@@ -24,12 +24,10 @@ pub trait Mapper {
 pub struct MapperNROM {}
 impl Mapper for MapperNROM {
     fn read_chr (&self, address: u16, chr: &Vec<u8>) -> u8 {
-        // debug!("Read CHR @ {:#x}", address);
         chr[address as usize]
     }
 
     fn write_chr (&mut self, address: u16, data: u8, chr: &mut Vec<u8>) {
-        // debug!("Write CHR @ {:#x}", address);
         chr[address as usize] = data;
     }
 
@@ -49,7 +47,7 @@ impl Mapper for MapperNROM {
         }
     }
         
-    fn write_prg (&mut self, address: u16, data: u8, prg_ram: &mut [u8], prg_rom: &mut Vec<u8>) {
+    fn write_prg (&mut self, address: u16, data: u8, prg_ram: &mut [u8]) {
         match address {
             0x6000 ..= 0x7FFF => {
                 prg_ram[address as usize - 0x6000] = data;

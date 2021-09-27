@@ -21,18 +21,17 @@ Based on https://wiki.nesdev.com/w/index.php/Emulator_tests
 
 | Test                  | Status    |
 |-----------------------|-----------|
-| `branch_timing_tests` | ✅ Passed  |
-| `cpu_dummy_reads`     | ❌ Mapper missing    |
-| `cpu_dummy_writes`    | -         |
-| `cpu_exec_space`      | ❌ 1/2 (APU missing)          |
+| `branch_timing_tests` | ✅ Passed             |
+| `cpu_dummy_reads`     | ❌ Mapper missing     |
+| `cpu_dummy_writes`    | ❌ 0/2                |
+| `cpu_exec_space`      | ❌ 1/2 (APU missing)  |
 | `cpu_flag_concurrency`| -         |
-| `cpu_interrupts_v2`   | ❌ APU missing       |
-| `cpu_reset`           | ❌ APU missing       |
-| `cpu_timing_test6`    | ✅ Passed |
-| `instr_misc`          | ❌ Mapper missing    |
-| `instr_test_v5`       | ❌ Mapper missing    |
+| `cpu_interrupts_v2`   | ❌ APU missing        |
+| `cpu_reset`           | ❌ APU missing        |
+| `cpu_timing_test6`    | ✅ Passed             |
+| `instr_misc`          | ❌ Mapper missing     |
+| `instr_test_v5`       | ❌ Mapper missing     |
 | `nestest`             | ✅ Passed (official only)     |
-| `ram_retain`          | -         |
 
 #### PPU
 
@@ -44,7 +43,7 @@ Based on https://wiki.nesdev.com/w/index.php/Emulator_tests
 | `oam_read`                        | ✅ Passed |
 | `oam_stress`                      | ❌ Failed |
 | `oamtest3`                        | ❌ Mapper missing     |
-| `ppu_open_bus`                    | ❌ Not implemented    |
+| `ppu_open_bus`                    | ❌ Decay not implemented  |
 | `ppu_read_buffer`                 | ❌ Mapper missing     |
 | `ppu_sprite_hit`                  | ❌ 2/10   |
 | `ppu_sprite_overflow`             | ❌ 1/5    |

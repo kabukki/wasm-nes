@@ -26,6 +26,7 @@ pub struct Bus {
     pub cartridge: Option<Cartridge>,
     pub dma: Option<Dma>,
     pub controllers: [Controller; 2],
+    pub read_buffer: u8, // Open bus
 }
 
 impl Bus {
@@ -36,6 +37,7 @@ impl Bus {
             cartridge: None,
             dma: None,
             controllers: [Controller::new(); 2],
+            read_buffer: 0,
         }
     }
 
@@ -46,15 +48,19 @@ impl Bus {
     pub fn read (&mut self, address: u16) -> u8 {
         let cartridge = self.cartridge.as_ref().unwrap();
 
-        match address {
+        let data = match address {
             0x0000 ..= 0x1FFF => self.wram[address as usize % 0x800],
             0x2000 ..= 0x3FFF => self.ppu.read(cartridge, address),
             0x4000 ..= 0x4015 => unimplemented!("APU not implemented"),
-            0x4016 => self.controllers[0].read(),
-            0x4017 => self.controllers[1].read(),
+            0x4016 => self.controllers[0].read() | (self.read_buffer & 0b1110_0000),
+            0x4017 => self.controllers[1].read() | (self.read_buffer & 0b1110_0000),
             0x4018 ..= 0x401F => panic!("Disabled functionality"),
             0x4020 ..= 0xFFFF => cartridge.read_prg(address),
-        }
+        };
+
+        self.read_buffer = data;
+
+        data
     }
 
     pub fn write (&mut self, address: u16, data: u8) {

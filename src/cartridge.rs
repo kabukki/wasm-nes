@@ -32,18 +32,18 @@ pub enum Mirroring {
     FourScreen,
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum ChrType {
     ROM,
     RAM,
 }
 
 pub struct Cartridge {
-    pub prg_ram: [u8; 2048],
+    pub prg_ram: Vec<u8>,
     pub prg_rom: Vec<u8>,
     pub chr: Vec<u8>,
-    pub mirroring: Mirroring,
-    pub mapper: Box<dyn Mapper>,
+    mirroring: Mirroring,
+    mapper: Box<dyn Mapper>,
 }
 
 impl Cartridge {
@@ -61,17 +61,17 @@ impl Cartridge {
         let chr_type = if chr_banks > 0 { ChrType::ROM } else { ChrType::RAM };
         let mapper = (header[6] & ControlFlag1::Mapper as u8) >> 4 | (header[7] & ControlFlag2::Mapper as u8);
         let trainer = header[6] & ControlFlag1::Trainer as u8 != 0;
-        let ram = if header[8] == 0 { 1 } else { header[8] as usize } * 0x8000;
+        let ram = if header[8] == 0 { 1 } else { header[8] as usize } * 0x2000;
         let mirroring = match (header[6] & ControlFlag1::FourScreen as u8 != 0, header[6] & ControlFlag1::Vertical as u8 != 0) {
             (true, _) => Mirroring::FourScreen,
             (false, false) => Mirroring::Horizontal,
             (false, true) => Mirroring::Vertical,
         };
 
-        debug!("PRG banks: {}\nCHR banks: {}\nMapper: {}\nRAM size: {}\nHas trainer ? {}\nMirroring: {:?}", prg_banks, chr_banks, mapper, ram, trainer, mirroring);
+        debug!("PRG banks: {}\nCHR banks: {} ({:?})\nMapper: {}\nRAM size: {}\nHas trainer ? {}\nMirroring: {:?}", prg_banks, chr_banks, chr_type, mapper, ram, trainer, mirroring);
 
         let mut cartridge = Cartridge {
-            prg_ram: [0; 2048],
+            prg_ram: vec![0; ram],
             prg_rom: vec![0; prg_banks * PRG_BANK_SIZE],
             chr: vec![0; std::cmp::max(chr_banks, 1) * CHR_BANK_SIZE], // No distinction between CHR ROM and RAM
             mirroring,
@@ -90,21 +90,6 @@ impl Cartridge {
         cartridge
     }
 
-    pub fn get_tile (&self, n: usize) -> Vec<u8> {
-        let mut tile = Vec::with_capacity(8 * 8);
-
-        for tile_y in 0..8 {
-            let (hi, lo) = (self.chr[n * 16 + tile_y + 8], self.chr[n * 16 + tile_y]);
-    
-            for tile_x in 0..8 {
-                let (hi, lo) = (hi >> (7 - tile_x) & 1, lo >> (7 - tile_x) & 1);
-                tile.push(hi << 1 | lo);
-            }
-        }
-
-        tile
-    }
-
     pub fn read_chr (&self, address: u16) -> u8 {
         self.mapper.read_chr(address, &self.chr)
     }
@@ -120,5 +105,24 @@ impl Cartridge {
     pub fn write_prg (&mut self, address: u16, data: u8) {
         // println!("Write PRG @ {:#x} <- {:#x}", address, data);
         self.mapper.write_prg(address, data, &mut self.prg_ram);
+    }
+
+    pub fn get_mirroring (&self) -> Mirroring {
+        self.mapper.get_mirroring().unwrap_or(self.mirroring)
+    }
+
+    pub fn get_tile (&self, n: usize) -> Vec<u8> {
+        let mut tile = Vec::with_capacity(8 * 8);
+
+        for tile_y in 0..8 {
+            let (hi, lo) = (self.chr[n * 16 + tile_y + 8], self.chr[n * 16 + tile_y]);
+    
+            for tile_x in 0..8 {
+                let (hi, lo) = (hi >> (7 - tile_x) & 1, lo >> (7 - tile_x) & 1);
+                tile.push(hi << 1 | lo);
+            }
+        }
+
+        tile
     }
 }

@@ -558,19 +558,16 @@ impl Ppu {
                 // Clear vblank bit on read
                 self.status &= !(StatusFlag::VBlank as u8);
                 self.write_latch = false;
-                self.read_buffer = status;
                 status
             },
             // OAMDATA
             0x2004 => {
                 // On visible scanline and cycles 1-64, reading OAMDATA returns 0xFF to reset the secondary OAM
-                self.read_buffer = if (self.status & StatusFlag::VBlank as u8) == 0 && self.dot >= 1 && self.dot <= 64 {
+                if (self.status & StatusFlag::VBlank as u8) == 0 && self.dot >= 1 && self.dot <= 64 {
                     0xFF
                 } else {
                     self.oam[self.oam_address as usize]
-                };
-
-                self.read_buffer
+                }
             },
             // PPUDATA
             0x2007 => {
@@ -650,7 +647,6 @@ impl Ppu {
             },
             _ => {}, // panic!("Invalid I/O write @ {:#x}", address),
         }
-        self.read_buffer = data;
     }
 
     /**
@@ -661,7 +657,6 @@ impl Ppu {
         match address % 0x4000 {
             // Pattern tables in cartridge CHR ROM/RAM
             0x0000 ..= 0x1FFF => {
-                // TODO specific addressing
                 cartridge.read_chr(address)
             },
             // Name tables (1024 bytes each), containing tiles (32x30 = 960 bytes) & the attribute table (64 bytes)
@@ -713,7 +708,7 @@ impl Ppu {
      * https://wiki.nesdev.com/w/index.php/Mirroring
      */
     pub fn mirror (&self, cartridge: &Cartridge, address: u16) -> u16 {
-        match cartridge.mirroring {
+        match cartridge.get_mirroring() {
             Mirroring::Horizontal => match address {
                 0x2000 ..= 0x23FF => address,
                 0x2400 ..= 0x27FF => address - 0x400,

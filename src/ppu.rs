@@ -705,10 +705,11 @@ impl Ppu {
 
     /**
      * Mirror a nametable address
-     * https://wiki.nesdev.com/w/index.php/Mirroring
+     * https://wiki.nesdev.org/w/index.php/Mirroring#Nametable_Mirroring
      */
     pub fn mirror (&self, cartridge: &Cartridge, address: u16) -> u16 {
         match cartridge.get_mirroring() {
+            Mirroring::OneScreenLower | Mirroring::OneScreenUpper => address % 0x400 + 0x2000,
             Mirroring::Horizontal => match address {
                 0x2000 ..= 0x23FF => address,
                 0x2400 ..= 0x27FF => address - 0x400,

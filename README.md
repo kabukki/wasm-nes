@@ -10,7 +10,7 @@ A **NES** emulator written in Rust compiled to WebAssemly for usage on the web.
 - ✅ Pixel Processing Unit
 - ❌ Audio Processing Unit 
 - ✅ Input devices (keyboard & controller)
-- 🚧 Cartridge [mappers](https://wiki.nesdev.com/w/index.php/Mapper): `NROM`, `UxROM`
+- 🚧 Cartridge [mappers](https://wiki.nesdev.com/w/index.php/Mapper): `NROM`, `MMC1`, `UxROM`, `CNROM`, `GxROM`.
 - ❌ Game progress save
 
 ### Well-known tests
@@ -22,7 +22,7 @@ Based on https://wiki.nesdev.com/w/index.php/Emulator_tests
 | Test                  | Status    |
 |-----------------------|-----------|
 | `branch_timing_tests` | ✅ Passed             |
-| `cpu_dummy_reads`     | ❌ Mapper missing     |
+| `cpu_dummy_reads`     | ❌ Failed             |
 | `cpu_dummy_writes`    | ❌ 0/2                |
 | `cpu_exec_space`      | ❌ 1/2 (APU missing)  |
 | `cpu_flag_concurrency`| -         |

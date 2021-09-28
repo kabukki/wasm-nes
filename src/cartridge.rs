@@ -8,8 +8,9 @@ use std::io::prelude::*;
 use std::io::Cursor;
 use crate::mapper::{Mapper, get_mapper};
 
-pub const PRG_BANK_SIZE: usize = 16 * 1024; // 16 KiB
-pub const CHR_BANK_SIZE: usize = 8 * 1024; // 8 KiB
+pub const PRG_BANK_SIZE: usize = 0x4000; // 16 KiB
+pub const CHR_BANK_SIZE: usize = 0x2000; // 8 KiB
+pub const RAM_BANK_SIZE: usize = 0x2000; // 8 KiB
 
 pub enum ControlFlag1 {
     Vertical    =   0b0000_0001,
@@ -27,6 +28,8 @@ pub enum ControlFlag2 {
 #[wasm_bindgen]
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Mirroring {
+    OneScreenLower,
+    OneScreenUpper,
     Horizontal,
     Vertical,
     FourScreen,
@@ -61,7 +64,7 @@ impl Cartridge {
         let chr_type = if chr_banks > 0 { ChrType::ROM } else { ChrType::RAM };
         let mapper = (header[6] & ControlFlag1::Mapper as u8) >> 4 | (header[7] & ControlFlag2::Mapper as u8);
         let trainer = header[6] & ControlFlag1::Trainer as u8 != 0;
-        let ram = if header[8] == 0 { 1 } else { header[8] as usize } * 0x2000;
+        let ram = header[8] as usize;
         let mirroring = match (header[6] & ControlFlag1::FourScreen as u8 != 0, header[6] & ControlFlag1::Vertical as u8 != 0) {
             (true, _) => Mirroring::FourScreen,
             (false, false) => Mirroring::Horizontal,
@@ -71,7 +74,7 @@ impl Cartridge {
         debug!("PRG banks: {}\nCHR banks: {} ({:?})\nMapper: {}\nRAM size: {}\nHas trainer ? {}\nMirroring: {:?}", prg_banks, chr_banks, chr_type, mapper, ram, trainer, mirroring);
 
         let mut cartridge = Cartridge {
-            prg_ram: vec![0; ram],
+            prg_ram: vec![0; std::cmp::max(ram, 1) * RAM_BANK_SIZE],
             prg_rom: vec![0; prg_banks * PRG_BANK_SIZE],
             chr: vec![0; std::cmp::max(chr_banks, 1) * CHR_BANK_SIZE], // No distinction between CHR ROM and RAM
             mirroring,

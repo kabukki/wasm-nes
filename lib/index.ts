@@ -1,6 +1,6 @@
 import GameStats from 'game-stats';
 
-import init, { Nes, set_panic_hook, set_log } from '../pkg';
+import init, { Nes, set_panic_hook, set_log, fingerprint } from '../pkg';
 
 /**
  * The NES's master clock frequency is 21.477272 Mhz.
@@ -14,7 +14,6 @@ import init, { Nes, set_panic_hook, set_log } from '../pkg';
 
 interface Options {
     debugRate: number;
-    canvas: HTMLCanvasElement;
     onError?: (err: Error) => void;
     onDebug?: (info: any) => void;
 }
@@ -25,6 +24,29 @@ export enum Status {
     Crashed,
 }
 
+export interface Snapshot {
+    rom: Rom;
+    date: Date;
+    data: Uint8Array;
+    thumbnail: string;
+}
+
+export interface Rom {
+    name: string;
+    buffer: Uint8Array;
+    fingerprint: string;
+}
+
+export async function getRom (file: File) {
+    const buffer = new Uint8Array(await file?.arrayBuffer());
+
+    return {
+        name: file.name,
+        buffer,
+        fingerprint: fingerprint(buffer),
+    } as Rom;
+}
+
 export class Emulator {
     private vm: Nes;
     private rafHandle: ReturnType<typeof requestAnimationFrame>;
@@ -32,24 +54,20 @@ export class Emulator {
     private inputs: Uint8Array;
     private stats: GameStats;
     public status: Status;
+    public canvas: HTMLCanvasElement;
+    public rom: Rom;
 
-    constructor () {
-        this.vm = Nes.new();
+    constructor (canvas: HTMLCanvasElement, rom: Rom) {
+        this.vm = Nes.new(rom.buffer);
         this.inputs = new Uint8Array([0, 0]);
         this.stats = new GameStats();
         this.status = Status.Idle;
+        this.canvas = canvas;
+        this.rom = rom;
     }
 
-    load (rom: Uint8Array) {
-        this.vm.load(rom);
-    }
-
-    start ({
-        canvas,
-        onError,
-        onDebug,
-    }: Options) {
-        const context = canvas.getContext('2d', { alpha: false });
+    start ({ onError, onDebug }: Options) {
+        const context = this.canvas.getContext('2d', { alpha: false });
         const rafCallback = (timestamp) => {
             try {
                 this.vm.update_controllers(this.inputs);
@@ -99,10 +117,31 @@ export class Emulator {
             this.inputs[index] = input;
         }
     }
+
+    snapshot (): Snapshot {
+        return {
+            rom: this.rom,
+            date: new Date(),
+            data: this.vm.take_snapshot(),
+            thumbnail: this.canvas.toDataURL(),
+        };
+    }
+
+    restore (snapshot: Snapshot) {
+        this.rom = snapshot.rom;
+        this.vm = Nes.new(snapshot.rom.buffer);
+        this.vm.load_snapshot(snapshot.data);
+    }
 }
 
-export default function () {
-    return init().then(set_panic_hook).then(set_log);
+export default async function () {
+    const wasm = await init();
+    
+    set_panic_hook();
+    set_log();
+
+    return wasm;
 }
 
 export * from './input';
+export * from './store';

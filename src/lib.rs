@@ -3,6 +3,7 @@ extern crate wee_alloc;
 
 use wasm_bindgen::{prelude::*, Clamped};
 use wee_alloc::WeeAlloc;
+use serde::{Serialize, Deserialize};
 use crate::bus::Bus;
 use crate::cpu::Cpu;
 use crate::ppu::CtrlFlag;
@@ -20,6 +21,11 @@ pub mod controller;
 #[global_allocator]
 static GLOBAL: WeeAlloc = WeeAlloc::INIT;
 
+#[derive(Serialize, Deserialize)]
+pub struct Snapshot {
+    prg_ram: Vec<u8>,
+}
+
 #[wasm_bindgen]
 pub struct Nes {
     cpu: Cpu,
@@ -29,20 +35,17 @@ pub struct Nes {
 
 #[wasm_bindgen]
 impl Nes {
-    pub fn new () -> Self {
-        Nes {
+    pub fn new (rom: Vec<u8>) -> Self {
+        let mut emulator = Nes {
             cpu: Cpu::new(),
             bus: Bus::new(),
             cycles: 0,
-        }
-    }
+        };
 
-    /**
-     * Load a ROM
-     */
-    pub fn load (&mut self, rom: Vec<u8>) {
-        self.bus.load(&rom);
-        self.cpu.reset();
+        emulator.bus.load(&rom);
+        emulator.cpu.reset();
+
+        emulator
     }
 
     /**
@@ -203,11 +206,19 @@ impl Nes {
     pub fn get_oam (&self) -> Vec<u8> {
         self.bus.ppu.oam.to_vec()
     }
-}
 
-impl Default for Nes {
-    fn default () -> Self {
-        Nes::new()
+    pub fn take_snapshot (&self) -> Vec<u8> {
+        let snapshot = Snapshot {
+            prg_ram: self.bus.cartridge.as_ref().unwrap().prg_ram.to_vec(),
+            
+        };
+
+        bincode::serialize(&snapshot).unwrap()
+    }
+
+    pub fn load_snapshot (&mut self, snapshot: Vec<u8>) {
+        let snapshot: Snapshot = bincode::deserialize(&snapshot).unwrap();
+        self.bus.cartridge.as_mut().unwrap().prg_ram.copy_from_slice(&snapshot.prg_ram);
     }
 }
 
@@ -219,4 +230,14 @@ pub fn set_panic_hook () {
 #[wasm_bindgen]
 pub fn set_log () {
     console_log::init_with_level(log::Level::Trace).expect("Could not set up logger");
+}
+
+#[wasm_bindgen]
+pub fn fingerprint (data: Vec<u8>) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hasher;
+
+    let mut hasher = DefaultHasher::new();
+    hasher.write(&data);
+    format!("{:x}", hasher.finish())
 }

@@ -6,12 +6,14 @@ A **NES** emulator written in Rust compiled to WebAssemly for usage on the web.
 
 ## Current implementation status:
 
+### Features
+
 - ✅ Central Processing Unit (Ricoh 2A03) 
 - ✅ Pixel Processing Unit
 - ❌ Audio Processing Unit 
 - ✅ Input devices (keyboard & controller)
-- 🚧 Cartridge [mappers](https://wiki.nesdev.com/w/index.php/Mapper): `NROM`, `MMC1`, `UxROM`, `CNROM`, `GxROM`.
-- ❌ Game progress save
+- ✅ Cartridge [mappers](https://wiki.nesdev.com/w/index.php/Mapper): `NROM`, `MMC1`, `UxROM`, `CNROM`, `GxROM`.
+- 🚧 Load/save state
 
 ### Well-known tests
 
@@ -44,7 +46,7 @@ Based on https://wiki.nesdev.com/w/index.php/Emulator_tests
 | `oam_stress`                      | ❌ Failed |
 | `oamtest3`                        | ❌ Mapper missing     |
 | `ppu_open_bus`                    | ❌ Decay not implemented  |
-| `ppu_read_buffer`                 | ❌ Mapper missing     |
+| `ppu_read_buffer`                 | ❌ Failed |
 | `ppu_sprite_hit`                  | ❌ 2/10   |
 | `ppu_sprite_overflow`             | ❌ 1/5    |
 | `ppu_vbl_nmi`                     | ❌ 0/10   |
@@ -62,6 +64,12 @@ Based on https://wiki.nesdev.com/w/index.php/Emulator_tests
 | Test                  | Status    |
 |-----------------------|-----------|
 | `Holy Mapperel`       | ❌ APU missing    |
+
+### Weak points
+
+The emulator currently lacks in the following areas:
+- Precise PPU timing
+- Open bus behaviour
 
 ## Development
 

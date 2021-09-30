@@ -65,20 +65,19 @@ pub struct Ppu {
     pub ctrl: u8,
     pub mask: u8,
     pub status: u8,
-    pub oam_dma: u8,
-    pub data: u8,
     pub nametables: [u8; 0x800], // Nametables. 2x1KiB (2 screen states)
     pub palettes: [u8; 0x20], // Palettes. 4x4 background + 4x4 sprite
     pub dot: u16,
     pub scanline: u16,
     pub framebuffer: Box<[u8; 256 * 240 * 4]>, // 512x480 -> 256x240 (32x30 = 960 tiles)
     pub frame: usize,
-    write_latch: bool,
     read_buffer: u8,
     
     // Background
     cur_address: u16, // loopy_v
-    tmp_address: u16, // loopy_t
+    tmp_address: u16, // loopy_t, top-left corner
+    scroll_x_fine: u8, // Fine X offset (0-7)
+    write_latch: bool,
     pattern_tile_id: u8,
     pattern_latch_hi: u8,
     pattern_latch_lo: u8,
@@ -87,7 +86,6 @@ pub struct Ppu {
     palette_latch: u8,
     palette_shift_hi: u16,
     palette_shift_lo: u16,
-    scroll_x_fine: u8, // Fine X offset (0-7)
     
     // Sprites
     pub oam: [u8; 256], // Sprite RAM: 64 * 4 bytes (Y, tile #, attribute, X)
@@ -105,21 +103,20 @@ pub struct Ppu {
 impl Ppu {
     pub fn new () -> Ppu {
         Ppu {
-            ctrl: 0b0000_0000,
+            ctrl: 0,
             mask: 0,
             status: StatusFlag::VBlank as u8,
-            oam_dma: 0,
-            data: 0,
             nametables: [0; 0x800],
             palettes: [0; 0x20],
             dot: 0,
             scanline: 261, // start @ pre-render
             framebuffer: Box::new([0; 256 * 240 * 4]),
             frame: 0,
-            write_latch: false,
             read_buffer: 0,
             cur_address: 0,
             tmp_address: 0,
+            scroll_x_fine: 0,
+            write_latch: false,
             pattern_tile_id: 0,
             pattern_latch_hi: 0,
             pattern_latch_lo: 0,
@@ -128,7 +125,6 @@ impl Ppu {
             palette_latch: 0,
             palette_shift_hi: 0,
             palette_shift_lo: 0,
-            scroll_x_fine: 0,
             oam: [0; 256],
             oam_index: 0,
             oam_index_overflowed: false,

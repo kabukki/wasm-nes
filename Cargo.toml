@@ -18,3 +18,5 @@ wasm-bindgen = "0.2.74"
 wee_alloc = "0.4.5"
 console_error_panic_hook = "0.1.6"
 console_log = { version = "0.2", features = ["color"] }
+serde = { version = "1.0.130", features = ["derive"] }
+bincode = "1.3.3"

@@ -11,7 +11,6 @@
  * http://wiki.nesdev.com/w/index.php/PPU_nametables
  */
 
-use log::warn;
 use crate::cpu::{Cpu, Interrupt};
 use crate::cartridge::{Cartridge, Mirroring};
 

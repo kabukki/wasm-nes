@@ -16,6 +16,7 @@ interface Options {
     debugRate: number;
     onError?: (err: Error) => void;
     onDebug?: (info: any) => void;
+    onSave?: (save: Save) => void;
 }
 
 export enum Status {
@@ -24,8 +25,8 @@ export enum Status {
     Crashed,
 }
 
-export interface Snapshot {
-    rom: Rom;
+export interface Save {
+    name: string;
     date: Date;
     data: Uint8Array;
     thumbnail: string;
@@ -50,6 +51,7 @@ export async function getRom (file: File) {
 export class Emulator {
     private vm: Nes;
     private rafHandle: ReturnType<typeof requestAnimationFrame>;
+    private saveHandle: ReturnType<typeof setInterval>;
     private debugHandle: ReturnType<typeof setInterval>;
     private inputs: Uint8Array;
     private stats: GameStats;
@@ -66,7 +68,7 @@ export class Emulator {
         this.rom = rom;
     }
 
-    start ({ onError, onDebug }: Options) {
+    start ({ onError, onDebug, onSave }: Options) {
         const context = this.canvas.getContext('2d', { alpha: false });
         const rafCallback = (timestamp) => {
             try {
@@ -81,21 +83,18 @@ export class Emulator {
             }
         };
 
+        this.saveHandle = setInterval(() => {
+            onSave?.(this.getSave());
+        }, 1000);
         this.debugHandle = setInterval(() => {
             onDebug?.({
                 stats: this.stats.stats(),
-                // ram: this.vm.get_ram(),
+                ram: this.vm.get_ram(),
                 // ram_nametables: this.vm.get_nametable_ram(),
-                // ram_cartridge: this.vm.get_cartridge_ram(),    
+                ram_cartridge: this.vm.get_cartridge_ram(),    
                 patternTables: this.vm.get_pattern_tables(),
                 palettes: this.vm.get_palettes(),
                 palette: this.vm.get_palette(),
-                // nametables: [
-                //     this.vm.get_nametable(0),
-                //     this.vm.get_nametable(1),
-                //     this.vm.get_nametable(2),
-                //     this.vm.get_nametable(3),
-                // ],
             });
         }, 1000);
         this.rafHandle = requestAnimationFrame(rafCallback);
@@ -103,6 +102,7 @@ export class Emulator {
     }
 
     stop (error?: Error) {
+        clearInterval(this.saveHandle);
         clearInterval(this.debugHandle);
         cancelAnimationFrame(this.rafHandle);
         this.status = error ? Status.Crashed : Status.Idle;
@@ -118,19 +118,17 @@ export class Emulator {
         }
     }
 
-    snapshot (): Snapshot {
+    getSave (): Save {
         return {
-            rom: this.rom,
+            name: this.rom.name,
             date: new Date(),
-            data: this.vm.take_snapshot(),
+            data: this.vm.get_cartridge_ram(),
             thumbnail: this.canvas.toDataURL(),
         };
     }
 
-    restore (snapshot: Snapshot) {
-        this.rom = snapshot.rom;
-        this.vm = Nes.new(snapshot.rom.buffer);
-        this.vm.load_snapshot(snapshot.data);
+    loadSave (save: Save) {
+        this.vm.set_cartridge_ram(save.data);
     }
 }
 

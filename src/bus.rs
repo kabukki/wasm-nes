@@ -1,4 +1,5 @@
 use crate::ppu::Ppu;
+use crate::apu::Apu;
 use crate::cartridge::Cartridge;
 use crate::controller::Controller;
 
@@ -25,6 +26,7 @@ pub struct Dma {
 pub struct Bus {
     pub wram: [u8; 0x800], // 2 KiB, mirrored (max 11 bits)
     pub ppu: Ppu,
+    pub apu: Apu,
     pub cartridge: Option<Cartridge>,
     pub dma: Option<Dma>,
     pub controllers: [Controller; 2],
@@ -36,6 +38,7 @@ impl Bus {
         Bus {
             wram: [0; 0x800],
             ppu: Ppu::new(),
+            apu: Apu::new(),
             cartridge: None,
             dma: None,
             controllers: [Controller::new(); 2],
@@ -53,7 +56,7 @@ impl Bus {
         let data = match address {
             0x0000 ..= 0x1FFF => self.wram[address as usize % 0x800],
             0x2000 ..= 0x3FFF => self.ppu.read(cartridge, address),
-            0x4000 ..= 0x4015 => unimplemented!("APU not implemented"),
+            0x4000 ..= 0x4015 => self.apu.read(address),
             0x4016 => self.controllers[0].read() | (self.read_buffer & 0b1110_0000),
             0x4017 => self.controllers[1].read() | (self.read_buffer & 0b1110_0000),
             0x4018 ..= 0x401F => panic!("Disabled functionality"),
@@ -75,7 +78,9 @@ impl Bus {
             0x2000 ..= 0x3FFF => {
                 self.ppu.write(cartridge, address, data);
             }
-            0x4000 ..= 0x4013 => {}, // APU
+            0x4000 ..= 0x4013 | 0x4015 | 0x4017 => {
+                self.apu.write(address, data);
+            },
             0x4014 => {
                 self.dma = Some(Dma {
                     page: data,
@@ -84,12 +89,10 @@ impl Bus {
                     read_buffer: 0,
                 });
             },
-            0x4015 => {}, // APU
             0x4016 => {
                 self.controllers[0].write(data);
                 self.controllers[1].write(data);
             },
-            0x4017 => {}, // APU
             0x4018 ..= 0x401F => panic!("Disabled functionality"),
             0x4020 ..= 0xFFFF => {
                 cartridge.write_prg(address, data);

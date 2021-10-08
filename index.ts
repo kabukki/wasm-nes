@@ -1,6 +1,7 @@
 import GameStats from 'game-stats';
 
 import init, { Nes, set_panic_hook, set_log, fingerprint } from './pkg';
+import { Audio } from './audio';
 
 /**
  * The NES's master clock frequency is 21.477272 Mhz.
@@ -67,6 +68,7 @@ export class Emulator {
     private debugHandle: ReturnType<typeof setInterval>;
     private inputs: Uint8Array;
     private stats: GameStats;
+    private audio: Audio;
     public status: Status;
     public canvas: HTMLCanvasElement;
     public rom: Rom;
@@ -78,6 +80,7 @@ export class Emulator {
         this.status = Status.Idle;
         this.canvas = canvas;
         this.rom = rom;
+        this.audio = new Audio();
     }
 
     start ({ onError, onDebug, onSave }: Options) {
@@ -87,6 +90,8 @@ export class Emulator {
                 this.vm.update_controllers(this.inputs);
                 this.vm.frame();
                 context.putImageData(new ImageData(this.vm.get_framebuffer(), 32 * 8, 30 * 8), 0, 0);
+                // get audio chunk, play/buffer it and refresh analyzed audio canvas
+                // https://github.com/samirkumardas/pcm-player
                 this.rafHandle = requestAnimationFrame(rafCallback);
                 this.stats.record(timestamp);
             } catch (err) {
@@ -95,20 +100,26 @@ export class Emulator {
             }
         };
 
-        this.saveHandle = setInterval(() => {
-            onSave?.(this.getSave());
-        }, 1000);
-        this.debugHandle = setInterval(() => {
-            onDebug?.({
-                stats: this.stats.stats(),
-                ram: this.vm.get_ram(),
-                // ram_nametables: this.vm.get_nametable_ram(),
-                ram_cartridge: this.vm.get_cartridge_ram(),    
-                patternTables: this.vm.get_pattern_tables(),
-                palettes: this.vm.get_palettes(),
-                palette: this.vm.get_palette(),
-            });
-        }, 1000);
+        if (onSave) {
+            this.saveHandle = setInterval(() => {
+                onSave(this.getSave());
+            }, 1000);
+        }
+
+        if (onDebug) {
+            this.debugHandle = setInterval(() => {
+                onDebug({
+                    stats: this.stats.stats(),
+                    ram: this.vm.get_ram(),
+                    // ram_nametables: this.vm.get_nametable_ram(),
+                    // ram_cartridge: this.vm.get_cartridge_ram(),    
+                    patternTables: this.vm.get_pattern_tables(),
+                    palettes: this.vm.get_palettes(),
+                    palette: this.vm.get_palette(),
+                });
+            }, 1000);
+        }
+
         this.rafHandle = requestAnimationFrame(rafCallback);
         this.status = Status.Running;
     }

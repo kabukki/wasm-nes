@@ -15,6 +15,7 @@ pub mod instruction;
 pub mod ppu;
 pub mod tilemap;
 pub mod controller;
+pub mod apu;
 
 #[global_allocator]
 static GLOBAL: WeeAlloc = WeeAlloc::INIT;
@@ -74,6 +75,10 @@ impl Nes {
                     self.cpu.cycle(&mut self.bus);
                 },    
             }
+        }
+
+        if self.cycles % 6 == 0 {
+            self.bus.apu.cycle();
         }
 
         self.bus.ppu.cycle(&self.bus.cartridge.as_ref().unwrap(), &mut self.cpu);
@@ -173,6 +178,10 @@ impl Nes {
 
     pub fn set_cartridge_ram (&mut self, prg_ram: Vec<u8>) {
         self.bus.cartridge.as_mut().unwrap().prg_ram.copy_from_slice(&prg_ram);
+    }
+
+    pub fn get_audio (&self) -> u8 {
+        self.bus.apu.sample
     }
 }
 

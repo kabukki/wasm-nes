@@ -158,3 +158,8 @@ init().then(() => {
 
 - https://timcheeseman.com/nesdev
 - https://www.cc65.org/doc/ld65-5.html
+
+### Audio
+
+- https://jackschaedler.github.io/circles-sines-signals/dft_introduction.html
+- https://www.ams.jhu.edu/dan-mathofmusic/sound-waves/

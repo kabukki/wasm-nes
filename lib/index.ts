@@ -69,7 +69,7 @@ export class Emulator {
     }
 
     start ({ onError, onDebug, onSave }: Options) {
-        const context = this.canvas.getContext('2d', { alpha: false });
+        const context = this.canvas.getContext('2d');
         const rafCallback = (timestamp) => {
             try {
                 this.vm.update_controllers(this.inputs);

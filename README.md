@@ -70,7 +70,7 @@ Based on https://wiki.nesdev.com/w/index.php/Emulator_tests
 The emulator currently lacks in the following areas:
 - Precise PPU timing
 - Open bus behaviour
-- Spome sprites are not displayed correctly
+- Some sprites are not displayed correctly
 
 ## Development
 

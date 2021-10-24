@@ -357,44 +357,46 @@ impl Ppu {
     fn sprite_fetch (&mut self, cartridge: &Cartridge) {
         match (self.dot - 257) % 8 {
             // Sprite tile low byte
-            4 => {
+            cycle @ (4 | 6) => {
                 let index = ((self.dot - 257) / 8) as usize;
                 let sprite_y = self.oam_secondary[index * 4] as u16;
 
                 if sprite_y != 0xFF {
+                    let row = (self.scanline - sprite_y) % 8; // Take into account 16px high tiles
                     self.sprite_attributes[index] = self.oam_secondary[index * 4 + 2];
                     self.sprite_offsets[index] = self.oam_secondary[index * 4 + 3];
-                    self.sprite_shift_lo[index] = self.read_vram(
-                        cartridge,
-                        if (self.ctrl & CtrlFlag::Sprite as u8) > 0 { 0x1000 } else { 0 }
-                        | (self.oam_secondary[index * 4 + 1] as u16 * 16)
-                        | if (self.sprite_attributes[index] & SpriteAttribute::FlipVertical as u8) > 0 { 7 - (self.scanline - sprite_y) } else { self.scanline - sprite_y }
-                    );
+
+                    let address = if (self.ctrl & CtrlFlag::SpriteHeight as u8) > 0 {
+                        let half = (self.scanline - sprite_y) / 8; // Either top (0) or bottom (1) half
+
+                        (
+                            if (self.oam_secondary[index * 4 + 1] as u16 & 0b0000_0001) > 0 { 0x1000 } else { 0 }
+                            | ((self.oam_secondary[index * 4 + 1] as u16 & 0b1111_1110) + half) * 16
+                            | if (self.sprite_attributes[index] & SpriteAttribute::FlipVertical as u8) > 0 { 7 - row } else { row }
+                        )
+                    } else {
+                        (
+                            if (self.ctrl & CtrlFlag::Sprite as u8) > 0 { 0x1000 } else { 0 }
+                            | self.oam_secondary[index * 4 + 1] as u16 * 16
+                            | if (self.sprite_attributes[index] & SpriteAttribute::FlipVertical as u8) > 0 { 7 - row } else { row }
+                        )
+                    };
+
+                    let mut data = match cycle {
+                        4 => self.read_vram(cartridge, address),
+                        6 => self.read_vram(cartridge, address + 8),
+                        _ => unreachable!(),
+                    };
 
                     if (self.sprite_attributes[index] & SpriteAttribute::FlipHorizontal as u8) > 0 {
-                        self.sprite_shift_lo[index] = self.sprite_shift_lo[index].reverse_bits();
+                        data = data.reverse_bits();
                     }
-                }
-            },
-            // Sprite tile high byte
-            6 => {
-                let index = ((self.dot - 257) / 8) as usize;
-                let sprite_y = self.oam_secondary[index * 4] as u16;
 
-                if sprite_y != 0xFF {
-                    self.sprite_attributes[index] = self.oam_secondary[index * 4 + 2];
-                    self.sprite_offsets[index] = self.oam_secondary[index * 4 + 3];
-                    self.sprite_shift_hi[index] = self.read_vram(
-                        cartridge,
-                        if (self.ctrl & CtrlFlag::Sprite as u8) > 0 { 0x1000 } else { 0 }
-                        | (self.oam_secondary[index * 4 + 1] as u16 * 16)
-                        | if (self.sprite_attributes[index] & SpriteAttribute::FlipVertical as u8) > 0 { 7 - (self.scanline - sprite_y) } else { self.scanline - sprite_y }
-                        + 8
-                    );
-
-                    if (self.sprite_attributes[index] & SpriteAttribute::FlipHorizontal as u8) > 0 {
-                        self.sprite_shift_hi[index] = self.sprite_shift_hi[index].reverse_bits();
-                    }
+                    match cycle {
+                        4 => { self.sprite_shift_lo[index] = data; },
+                        6 => { self.sprite_shift_hi[index] = data; },
+                        _ => unreachable!(),
+                    };
                 }
             },
             _ => {},
@@ -432,7 +434,7 @@ impl Ppu {
                 // Loop will end at first non-transparent sprite pixel
                 if self.sprite_offsets[index] == 0 && fg_pixel == 0 {
                     let (hi, lo) = (self.sprite_shift_hi[index] >> 7, self.sprite_shift_lo[index] >> 7);
-                    fg_pixel = (hi << 1) | lo;
+                    fg_pixel = (hi & 1) << 1 | (lo & 1);
                     fg_palette = (self.sprite_attributes[index] & SpriteAttribute::Palette as u8) + 4;
                     fg_priority = (self.sprite_attributes[index] & SpriteAttribute::Priority as u8) == 0;
                     sprite_number = Some(index);

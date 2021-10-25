@@ -51,7 +51,7 @@ pub enum LoopyRegister {
 
 pub enum SpriteAttribute {
     Palette         = 0b0000_0011,
-    Unused          = 0b0001_1100,
+    Zero            = 0b0001_1100, // Normally unused, serves to keep track of sprite zero
     Priority        = 0b0010_0000,
     FlipHorizontal  = 0b0100_0000,
     FlipVertical    = 0b1000_0000,
@@ -331,6 +331,14 @@ impl Ppu {
                         if (self.oam_secondary_index / 4) < 8 {
                             self.oam_secondary[self.oam_secondary_index as usize .. self.oam_secondary_index as usize + 4]
                                 .copy_from_slice(&self.oam[self.oam_index as usize .. self.oam_index as usize + 4]);
+
+                            // Store sprite zero hit info in the sprite's attribute
+                            if self.oam_index == 0 {
+                                self.oam_secondary[self.oam_secondary_index as usize + 2] |= SpriteAttribute::Zero as u8;
+                            } else {
+                                self.oam_secondary[self.oam_secondary_index as usize + 2] &= !(SpriteAttribute::Zero as u8);
+                            }
+
                             self.oam_secondary_index += 4;
                         } else if (self.status & StatusFlag::SpriteOverflow as u8) == 0 {
                             self.status |= StatusFlag::SpriteOverflow as u8;
@@ -408,7 +416,7 @@ impl Ppu {
     fn draw_pixel (&mut self, cartridge: &Cartridge) {
         let (mut bg_pixel, mut bg_palette) = (0, 0);
         let (mut fg_pixel, mut fg_palette, mut fg_priority) = (0, 0, false);
-        let mut sprite_number: Option<usize> = None;
+        let mut sprite_zero_hit = false;
 
         if (self.mask & MaskFlag::Background as u8) > 0 {
             let (hi, lo) = ((self.pattern_shift_hi >> 8) as u8 >> (7 - self.scroll_x_fine), (self.pattern_shift_lo >> 8) as u8 >> (7 - self.scroll_x_fine));
@@ -436,7 +444,10 @@ impl Ppu {
                     fg_pixel = (hi & 1) << 1 | (lo & 1);
                     fg_palette = (self.sprite_attributes[index] & SpriteAttribute::Palette as u8) + 4;
                     fg_priority = (self.sprite_attributes[index] & SpriteAttribute::Priority as u8) == 0;
-                    sprite_number = Some(index);
+
+                    if (self.sprite_attributes[index] & SpriteAttribute::Zero as u8) > 0 {
+                        sprite_zero_hit = true;
+                    }
                 }
 
                 index += 1;
@@ -449,9 +460,9 @@ impl Ppu {
             (_, 0) => (bg_pixel, bg_palette),
             (_, _) => {
                 // Sprite zero hit
-                if self.dot < 255
+                if sprite_zero_hit
+                    && self.dot < 255
                     && (self.dot > 8 || (self.mask & (MaskFlag::BackgroundLeft as u8 | MaskFlag::SpritesLeft as u8) > 0))
-                    && sprite_number.is_some() && sprite_number.unwrap() == 0
                 {
                     self.status |= StatusFlag::Hit as u8;
                 }

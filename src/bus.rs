@@ -15,6 +15,8 @@ use crate::controller::Controller;
 pub struct Dma {
     pub page: u8,
     pub wait: bool,
+    pub count: u8,
+    pub read_buffer: u8,
 }
 
 /**
@@ -78,6 +80,8 @@ impl Bus {
                 self.dma = Some(Dma {
                     page: data,
                     wait: true,
+                    count: 0,
+                    read_buffer: 0,
                 });
             },
             0x4015 => {}, // APU

@@ -356,16 +356,15 @@ impl Ppu {
      */
     fn sprite_fetch (&mut self, cartridge: &Cartridge) {
         match (self.dot - 257) % 8 {
-            // Sprite tile low byte
             cycle @ (4 | 6) => {
                 let index = ((self.dot - 257) / 8) as usize;
                 let sprite_y = self.oam_secondary[index * 4] as u16;
 
                 if sprite_y != 0xFF {
-                    let row = (self.scanline - sprite_y) % 8; // Take into account 16px high tiles
                     self.sprite_attributes[index] = self.oam_secondary[index * 4 + 2];
                     self.sprite_offsets[index] = self.oam_secondary[index * 4 + 3];
-
+                    
+                    let row = (self.scanline - sprite_y) % 8; // Take into account 16px high tiles
                     let address = if (self.ctrl & CtrlFlag::SpriteHeight as u8) > 0 {
                         let half = (self.scanline - sprite_y) / 8; // Either top (0) or bottom (1) half
 
@@ -696,8 +695,8 @@ impl Ppu {
     /**
      * Copy bytes to OAM
      */
-    pub fn write_oam_dma (&mut self, data: &[u8]) {
-        self.oam.copy_from_slice(data);
+    pub fn write_oam (&mut self, address: u8, data: u8) {
+        self.oam[address as usize] = data;
     }
 
     /**

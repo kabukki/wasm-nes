@@ -55,10 +55,17 @@ impl Nes {
                             status.wait = false;
                         }
                     } else {
-                        let address = (status.page as usize) << 8;
-                        self.bus.ppu.write_oam_dma(&self.bus.wram[address .. address + 256]);
-                        self.cpu.cycles = 512;
-                        dma = None;
+                        if self.cycles % 2 == 0 {
+                            let address = ((status.page as u16) << 8) + status.count as u16;
+                            status.read_buffer = self.bus.read(address);
+                        } else {
+                            self.bus.ppu.write_oam(status.count, status.read_buffer);
+                            status.count += 1;
+
+                            if status.count == u8::MAX {
+                                dma = None;
+                            }
+                        }
                     }
 
                     self.bus.dma = dma;

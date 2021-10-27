@@ -1,85 +1,61 @@
 export class Audio {
     private ctx: AudioContext;
-    private oscillator: OscillatorNode;
+    private buffer: Float32Array;
+    private time: number;
+    private playHandle: ReturnType<typeof setInterval>;
+    private gain: GainNode;
 
     constructor () {
         this.ctx = new AudioContext();
-        this.oscillator = null;
+        this.buffer = new Float32Array();
+        this.time = this.ctx.currentTime;
+        this.gain = this.ctx.createGain();
+        this.gain.gain.value = 1;
+        this.gain.connect(this.ctx.destination)
     }
-    
-    play (chunk) {
-        const canvas = document.createElement('canvas');
-        canvas.height = 200;
-        canvas.width = 2048;5
-        canvas.style.width = '100%';
-        document.body.prepend(canvas);
 
-        const map = 0b0000_1111;
-        const buffer = this.ctx.createBuffer(1, 5 * this.ctx.sampleRate, this.ctx.sampleRate);
-        buffer.copyToChannel(Float32Array.from({ length: buffer.length }, (_, n) => 2 * ((map >> (n % 8)) & 1) - 1), 0);
-        console.log(buffer.getChannelData(0));
-        
-        // console.log(sample);
-        
-        const node = this.ctx.createBufferSource();
-        node.buffer = buffer;
-
-        const oscillator = this.ctx.createOscillator();
-        // (x, y) = (cos(angle), sin(angle));
-        // temps t, freq f, (x, y) = (cos(2pi.f.t), cos(2pi.f.t)). A = sin(2pi.f.t + phase)
-        // A (amplitude aka volume, cos): [offset, f, overtone], B (sin) [-, f, overtone]
-        const wave = this.ctx.createPeriodicWave([0, 1], [0, 0]);
-        oscillator.setPeriodicWave(wave);
-
-        const analyzer = this.ctx.createAnalyser();
-
-        // Graph
-        // node.connect(analyzer);
-        oscillator.connect(analyzer);
-        // analyzer.connect(this.ctx.destination);
-
-        // oscillator.start();
-        
-        const data = new Float32Array(analyzer.fftSize);
-        const ctx = canvas.getContext('2d');
-        ctx.strokeStyle = 'black';
-        
-        const draw = () => {
-            let x = 0;
-            analyzer.getFloatTimeDomainData(data);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.beginPath();
-
-            for (const td of data) {
-                const y = 100 + td * 10;
-                if (x === 0) {
-                    ctx.moveTo(x, y);
-                } else {
-                    ctx.lineTo(x, y);
-                }
-                x += canvas.width / analyzer.fftSize;
-            }
-            
-            ctx.stroke();
-            requestAnimationFrame(draw);
-        };
-
-        // setTimeout(draw, 500);
-        draw();
-
-        // if (!this.oscillator) {
-        //     this.oscillator = this.ctx.createOscillator();
-        //     this.oscillator.connect(this.ctx.destination);
-            // this.oscillator.type = '';
-        //     this.oscillator.frequency.value = 440;
-        //     this.oscillator.start();
-        // }
+    get sampleRate () {
+        return this.ctx.sampleRate;
     }
-    
-    pause () {
-        if (this.oscillator) {
-            this.oscillator.stop();
-            this.oscillator = null;
+
+    start () {
+        this.playHandle = setInterval(this.flush.bind(this), 1000);
+        this.ctx.resume();
+    }
+
+    stop () {
+        clearInterval(this.playHandle);
+        this.ctx.suspend();
+    }
+
+    /**
+     * Append samples to the buffer
+     */
+    queue (chunk: Float32Array) {
+        const buffer = new Float32Array(this.buffer.length + chunk.length);
+        buffer.set(this.buffer, 0);
+        buffer.set(chunk, this.buffer.length);
+        this.buffer = buffer;
+    }
+
+    /**
+     * Play audio in buffer and flush it
+     */
+    private flush () {
+        const source = this.ctx.createBufferSource();
+        source.buffer = this.ctx.createBuffer(1, this.buffer.length, this.ctx.sampleRate);
+        source.buffer.copyToChannel(this.buffer, 0);
+
+        // Catch up if needed
+        if (this.time < this.ctx.currentTime) {
+            this.time = this.ctx.currentTime;
         }
+
+        source.connect(this.gain);
+        source.start(this.time);
+        // console.log(`Time: ${this.time}, context time: ${this.ctx.currentTime}, playing for ${source.buffer.duration}`);
+
+        this.time += source.buffer.duration;
+        this.buffer = new Float32Array()
     }
 }

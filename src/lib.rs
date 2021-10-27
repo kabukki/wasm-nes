@@ -1,6 +1,3 @@
-extern crate console_error_panic_hook;
-extern crate wee_alloc;
-
 use wasm_bindgen::{prelude::*, Clamped};
 use wee_alloc::WeeAlloc;
 use crate::bus::Bus;
@@ -19,6 +16,12 @@ pub mod apu;
 
 #[global_allocator]
 static GLOBAL: WeeAlloc = WeeAlloc::INIT;
+
+// https://wiki.nesdev.org/w/index.php/Cycle_reference_chart
+const NTSC_CLOCK_MASTER: f32    = 21_477_272.0;
+const NTSC_CLOCK_PPU: f32       = NTSC_CLOCK_MASTER / 4.0;
+const NTSC_CLOCK_CPU: f32       = NTSC_CLOCK_MASTER / 12.0;
+const NTSC_CLOCK_APU: f32       = NTSC_CLOCK_MASTER / 24.0;
 
 #[wasm_bindgen]
 pub struct Nes {
@@ -46,6 +49,7 @@ impl Nes {
      * Cycle once
      */
     pub fn cycle (&mut self) {
+        // CPU
         if self.cycles % 3 == 0 {
             let mut dma = self.bus.dma;
 
@@ -76,19 +80,22 @@ impl Nes {
                 },    
             }
         }
-
+        
+        // APU
         if self.cycles % 6 == 0 {
             self.bus.apu.cycle();
         }
 
+        // PPU
         self.bus.ppu.cycle(&self.bus.cartridge.as_ref().unwrap(), &mut self.cpu);
+
         self.cycles += 1;
     }
 
     /**
      * Cycle until frame is rendered
      */
-    pub fn frame (&mut self) {
+    pub fn cycle_until_frame (&mut self) {
         let frame = self.bus.ppu.frame;
 
         while frame == self.bus.ppu.frame {
@@ -108,8 +115,8 @@ impl Nes {
         self.cpu.reset();
     }
 
-    pub fn get_framebuffer (&self) -> Clamped<Vec<u8>> {
-        Clamped(self.bus.ppu.framebuffer.to_vec())
+    pub fn get_framebuffer (&self, buffer: &mut [u8]) {
+        buffer.copy_from_slice(&self.bus.ppu.framebuffer.to_vec());
     }
 
     /**
@@ -180,8 +187,12 @@ impl Nes {
         self.bus.cartridge.as_mut().unwrap().prg_ram.copy_from_slice(&prg_ram);
     }
 
-    pub fn get_audio (&self) -> u8 {
-        self.bus.apu.sample
+    /**
+     * Extract the audio after resampling it
+     */
+    pub fn get_audio (&mut self, sample_rate: f32) -> Vec<f32> {
+        // Factor = source rate / target rate.
+        self.bus.apu.flush(NTSC_CLOCK_APU / sample_rate)
     }
 }
 

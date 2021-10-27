@@ -3,16 +3,6 @@ import GameStats from 'game-stats';
 import init, { Nes, set_panic_hook, set_log, fingerprint } from './pkg';
 import { Audio } from './audio';
 
-/**
- * The NES's master clock frequency is 21.477272 Mhz.
- * The PPU divides it by 4, hence runs at 5.369318 Mhz (3x CPU).
- * The CPU divides it by 12, hence runs at 1.7897727 Mhz.
- * The APU divides it by 89490, hence runs at 239.996335 Hz.
- * Since 12 / 4 = 3 there are 3 PPU clocks per 1 CPU clock.
- * Since 89490 / 12 = 7457.5 there are 7457.5 CPU clocks per 1 APU clock.
- * https://wiki.nesdev.com/w/index.php/Cycle_reference_chart
- */
-
 interface Options {
     debugRate: number;
     onError?: (err: Error) => void;
@@ -85,13 +75,15 @@ export class Emulator {
 
     start ({ onError, onDebug, onSave }: Options) {
         const context = this.canvas.getContext('2d');
+        const framebuffer = new Uint8ClampedArray(4 * this.canvas.width * this.canvas.height);
         const rafCallback = (timestamp) => {
             try {
                 this.vm.update_controllers(this.inputs);
-                this.vm.frame();
-                context.putImageData(new ImageData(this.vm.get_framebuffer(), 32 * 8, 30 * 8), 0, 0);
-                // get audio chunk, play/buffer it and refresh analyzed audio canvas
-                // https://github.com/samirkumardas/pcm-player
+                this.vm.cycle_until_frame();
+                this.vm.get_framebuffer((framebuffer as unknown) as Uint8Array);
+                const audio = this.vm.get_audio(this.audio.sampleRate);
+                this.audio.queue(audio);
+                context.putImageData(new ImageData(framebuffer, this.canvas.width, this.canvas.height), 0, 0);
                 this.rafHandle = requestAnimationFrame(rafCallback);
                 this.stats.record(timestamp);
             } catch (err) {
@@ -121,10 +113,12 @@ export class Emulator {
         }
 
         this.rafHandle = requestAnimationFrame(rafCallback);
+        this.audio.start();
         this.status = Status.Running;
     }
 
     stop (error?: Error) {
+        this.audio.stop();
         clearInterval(this.saveHandle);
         clearInterval(this.debugHandle);
         cancelAnimationFrame(this.rafHandle);

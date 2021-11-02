@@ -366,26 +366,26 @@ impl Ppu {
         match (self.dot - 257) % 8 {
             cycle @ (4 | 6) => {
                 let index = ((self.dot - 257) / 8) as usize;
-                let sprite_y = self.oam_secondary[index * 4] as u16;
-
+                let (sprite_y, sprite_id, sprite_attributes, sprite_x) = (
+                    self.oam_secondary[index * 4 + 0] as u16,
+                    self.oam_secondary[index * 4 + 1] as u16,
+                    self.oam_secondary[index * 4 + 2],
+                    self.oam_secondary[index * 4 + 3],
+                );
+                
                 if sprite_y != 0xFF {
-                    self.sprite_attributes[index] = self.oam_secondary[index * 4 + 2];
-                    self.sprite_offsets[index] = self.oam_secondary[index * 4 + 3];
-                    
                     let row = (self.scanline - sprite_y) % 8; // Take into account 16px high tiles
                     let address = if (self.ctrl & CtrlFlag::SpriteHeight as u8) > 0 {
                         let half = (self.scanline - sprite_y) / 8; // Either top (0) or bottom (1) half
 
-                        (
-                            if (self.oam_secondary[index * 4 + 1] as u16 & 0b0000_0001) > 0 { 0x1000 } else { 0 }
-                            | ((self.oam_secondary[index * 4 + 1] as u16 & 0b1111_1110) + half) * 16
-                            | if (self.sprite_attributes[index] & SpriteAttribute::FlipVertical as u8) > 0 { 7 - row } else { row }
-                        )
+                        (sprite_id & 0b0000_0001) * 0x1000
+                        | ((sprite_id & 0b1111_1110) + half) * 16
+                        | if (sprite_attributes & SpriteAttribute::FlipVertical as u8) > 0 { 7 - row } else { row }
                     } else {
                         (
                             if (self.ctrl & CtrlFlag::Sprite as u8) > 0 { 0x1000 } else { 0 }
-                            | self.oam_secondary[index * 4 + 1] as u16 * 16
-                            | if (self.sprite_attributes[index] & SpriteAttribute::FlipVertical as u8) > 0 { 7 - row } else { row }
+                            | sprite_id * 16
+                            | if (sprite_attributes & SpriteAttribute::FlipVertical as u8) > 0 { 7 - row } else { row }
                         )
                     };
 
@@ -395,7 +395,7 @@ impl Ppu {
                         _ => unreachable!(),
                     };
 
-                    if (self.sprite_attributes[index] & SpriteAttribute::FlipHorizontal as u8) > 0 {
+                    if (sprite_attributes & SpriteAttribute::FlipHorizontal as u8) > 0 {
                         data = data.reverse_bits();
                     }
 
@@ -404,6 +404,9 @@ impl Ppu {
                         6 => { self.sprite_shift_hi[index] = data; },
                         _ => unreachable!(),
                     };
+
+                    self.sprite_attributes[index] = sprite_attributes;
+                    self.sprite_offsets[index] = sprite_x;
                 }
             },
             _ => {},
@@ -460,10 +463,7 @@ impl Ppu {
             (_, 0) => (bg_pixel, bg_palette),
             (_, _) => {
                 // Sprite zero hit
-                if sprite_zero_hit
-                    && self.dot < 255
-                    && (self.dot > 8 || (self.mask & (MaskFlag::BackgroundLeft as u8 | MaskFlag::SpritesLeft as u8) > 0))
-                {
+                if sprite_zero_hit && self.dot < 255 && (self.dot > 8 || (self.mask & (MaskFlag::BackgroundLeft as u8 | MaskFlag::SpritesLeft as u8)) > 0) {
                     self.status |= StatusFlag::Hit as u8;
                 }
 
@@ -617,8 +617,7 @@ impl Ppu {
             },
             // OAMDATA
             0x2004 => {
-                self.oam[self.oam_address as usize] = data;
-                self.oam_address += 1;
+                self.write_oam(data);
             },
             // PPUSCROLL
             0x2005 => {
@@ -706,8 +705,9 @@ impl Ppu {
     /**
      * Copy bytes to OAM
      */
-    pub fn write_oam (&mut self, address: u8, data: u8) {
-        self.oam[address as usize] = data;
+    pub fn write_oam (&mut self, data: u8) {
+        self.oam[self.oam_address as usize] = data;
+        self.oam_address += 1;
     }
 
     /**

@@ -60,14 +60,16 @@ impl Nes {
                             status.wait = false;
                         }
                     } else {
+                        // Copy 256 bytes over 512 cycles
                         if self.cycles % 2 == 0 {
                             let address = ((status.page as u16) << 8) + status.count as u16;
                             status.read_buffer = self.bus.read(address);
                         } else {
-                            self.bus.ppu.write_oam(status.count, status.read_buffer);
-                            status.count += 1;
+                            self.bus.ppu.write_oam(status.read_buffer);
 
-                            if status.count == u8::MAX {
+                            if status.count < u8::MAX {
+                                status.count += 1;
+                            } else {
                                 dma = None;
                             }
                         }
@@ -173,6 +175,10 @@ impl Nes {
 
     pub fn get_ram (&self) -> Vec<u8> {
         self.bus.wram.to_vec()
+    }
+
+    pub fn get_oam (&self) -> Vec<u8> {
+        self.bus.ppu.oam.to_vec()
     }
 
     pub fn get_nametable_ram (&self) -> Vec<u8> {

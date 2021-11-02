@@ -103,6 +103,7 @@ export class Emulator {
                 onDebug({
                     stats: this.stats.stats(),
                     ram: this.vm.get_ram(),
+                    oam: this.vm.get_oam(),
                     // ram_nametables: this.vm.get_nametable_ram(),
                     // ram_cartridge: this.vm.get_cartridge_ram(),    
                     patternTables: this.vm.get_pattern_tables(),

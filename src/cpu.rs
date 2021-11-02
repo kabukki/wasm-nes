@@ -89,7 +89,7 @@ pub struct Cpu {
 impl Cpu {
     pub fn new () -> Cpu {
         Cpu {
-            pc: 0,
+            pc: 0x34,
             sp: 0,
             a: 0,
             x: 0,
@@ -182,7 +182,6 @@ impl Cpu {
         };
 
         self.pc = (bus.read(interrupt as u16 + 1) as u16) << 8 | bus.read(interrupt as u16) as u16;
-        // info!("PC now at {:x}", self.pc);
     }
 
     pub fn interrupt_request (&mut self, interrupt: Interrupt) {

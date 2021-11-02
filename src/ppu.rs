@@ -106,7 +106,10 @@ impl Ppu {
             mask: 0,
             status: StatusFlag::VBlank as u8,
             nametables: [0; 0x800],
-            palettes: [0; 0x20],
+            palettes: [
+                0x09, 0x01, 0x00, 0x01, 0x00, 0x02, 0x02, 0x0D, 0x08, 0x10, 0x08, 0x24, 0x00, 0x00, 0x04, 0x2C,
+                0x09, 0x01, 0x34, 0x03, 0x00, 0x04, 0x00, 0x14, 0x08, 0x3A, 0x00, 0x02, 0x00, 0x20, 0x2C, 0x08,
+            ],
             dot: 0,
             scanline: 261, // start @ pre-render
             framebuffer: Box::new([0; 256 * 240 * 4]),
@@ -312,7 +315,7 @@ impl Ppu {
                 if self.dot == 1 {
                     self.oam_secondary_index = 0;
                 } else if self.dot % 2 == 0 {
-                    self.oam_secondary[self.oam_secondary_index as usize] = self.read(cartridge, 0x2004);
+                    self.oam_secondary[self.oam_secondary_index as usize] = 0xFF;
                     self.oam_secondary_index += 1;
                 }
             },
@@ -569,12 +572,7 @@ impl Ppu {
             },
             // OAMDATA
             0x2004 => {
-                // On visible scanline and cycles 1-64, reading OAMDATA returns 0xFF to reset the secondary OAM
-                if (self.status & StatusFlag::VBlank as u8) == 0 && self.dot >= 1 && self.dot <= 64 {
-                    0xFF
-                } else {
-                    self.oam[self.oam_address as usize]
-                }
+                self.oam[self.oam_address as usize]
             },
             // PPUDATA
             0x2007 => {
@@ -659,7 +657,7 @@ impl Ppu {
      * Read memory
      * https://wiki.nesdev.com/w/index.php/PPU_memory_map
      */
-    pub fn read_vram (&self, cartridge: &Cartridge, address: u16) -> u8 {
+    fn read_vram (&self, cartridge: &Cartridge, address: u16) -> u8 {
         match address % 0x4000 {
             // Pattern tables in cartridge CHR ROM/RAM
             0x0000 ..= 0x1FFF => {

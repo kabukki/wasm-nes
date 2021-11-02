@@ -17,38 +17,39 @@ A **NES** emulator written in Rust compiled to WebAssemly for usage on the web.
 
 ### Well-known tests
 
-Based on https://wiki.nesdev.com/w/index.php/Emulator_tests
+Based on https://wiki.nesdev.com/w/index.php/Emulator_tests (available [here](https://github.com/christopherpow/nes-test-roms))
 
 #### CPU
 
-| Test                  | Status    |
-|-----------------------|-----------|
+| Test                  | Status                |
+|-----------------------|-----------------------|
 | `branch_timing_tests` | ✅ Passed             |
 | `cpu_dummy_reads`     | ❌ Failed             |
 | `cpu_dummy_writes`    | ❌ 0/2                |
-| `cpu_exec_space`      | ❌ 1/2 (APU missing)  |
-| `cpu_flag_concurrency`| -         |
-| `cpu_interrupts_v2`   | ❌ APU missing        |
-| `cpu_reset`           | ❌ APU missing        |
+| `cpu_exec_space`      | ❌ 0/2                |
+| `cpu_flag_concurrency`| -                     |
+| `cpu_interrupts_v2`   | ❌ Failed             |
+| `cpu_reset`           | ✅ 2/2                |
 | `cpu_timing_test6`    | ✅ Passed             |
 | `instr_misc`          | ✅ Passed             |
-| `instr_test_v5`       | ❌ APU missing        |
-| `nestest`             | ✅ Passed (official only)     |
+| `instr_test_v5`       | ⚠️ 14/16              |
+| `nestest`             | ✅ Passed (official)  |
 
 #### PPU
 
 | Test                              | Status    |
 |-----------------------------------|-----------|
-| `blargg_ppu_tests_2005.09.15b`    | ❌ Failed |
+| `blargg_ppu_tests_2005.09.15b`    | ⚠️ 3/5    |
 | `nmi_sync`                        | ❌ Failed |
 | `ntsc_torture`                    | -         |
 | `oam_read`                        | ✅ Passed |
 | `oam_stress`                      | ❌ Failed |
-| `oamtest3`                        | ❌ Mapper missing     |
+| `oamtest3`                        | ❌ Failed |
 | `ppu_open_bus`                    | ❌ Decay not implemented  |
 | `ppu_read_buffer`                 | ❌ Failed |
-| `ppu_sprite_hit`                  | ❌ 2/10   |
-| `ppu_sprite_overflow`             | ❌ 1/5    |
+| `ppu_sprite_hit`                  | ⚠️ 2/10   |
+| `ppu_sprite_overflow`             | ❌ 0/5    |
+| `sprite_overflow_tests`           | ⚠️ 3/5    |
 | `ppu_vbl_nmi`                     | ❌ 0/10   |
 | `scanline`                        | ❌ Failed |
 | `sprdma_and_dmc_dma`              | -         |
@@ -69,7 +70,7 @@ Based on https://wiki.nesdev.com/w/index.php/Emulator_tests
 
 The emulator currently lacks in the following areas:
 - Precise PPU timing
-- Open bus behaviour
+- Open bus behaviour is missing
 - Some sprites are not displayed correctly
 
 ## Development

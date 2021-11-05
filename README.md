@@ -10,7 +10,7 @@ A **NES** emulator written in Rust compiled to WebAssemly for usage on the web.
 
 - ✅ Central Processing Unit (Ricoh 2A03) 
 - ✅ Pixel Processing Unit
-- ❌ Audio Processing Unit 
+- 🚧 Audio Processing Unit: Pulse, ~~triangle~~, ~~noise~~, ~~DMC~~.
 - ✅ Input devices (keyboard & controller)
 - ✅ Cartridge [mappers](https://wiki.nesdev.com/w/index.php/Mapper): `NROM`, `MMC1`, `UxROM`, `CNROM`, `GxROM`.
 - ✅ Games saves via cartridge RAM
@@ -49,10 +49,10 @@ Based on https://wiki.nesdev.com/w/index.php/Emulator_tests (available [here](ht
 | `ppu_read_buffer`                 | ❌ Failed |
 | `ppu_sprite_hit`                  | ⚠️ 2/10   |
 | `ppu_sprite_overflow`             | ❌ 0/5    |
-| `sprite_overflow_tests`           | ⚠️ 3/5    |
 | `ppu_vbl_nmi`                     | ❌ 0/10   |
 | `scanline`                        | ❌ Failed |
 | `sprdma_and_dmc_dma`              | -         |
+| `sprite_overflow_tests`           | ⚠️ 3/5    |
 | `tvpassfail`                      | -         |
 
 #### APU
@@ -126,7 +126,7 @@ init().then(() => {
 - http://www.obelisk.me.uk/6502/reference.html
 - https://www.nesdev.com/6502_cpu.txt
 
-### Examples & tutorials
+### Examples / tutorials / inspiration
 
 - https://github.com/gianlucag/mos6502
 - https://github.com/GarettCooper/gc_nes_emulator

@@ -76,11 +76,6 @@ pub struct Cpu {
     pub cycles: usize,
 
     /**
-     * Total cycles run so far
-     */
-    pub cycles_total: usize,
-
-    /**
      * Pending interrupt
      */
     pub interrupt: Option<Interrupt>,
@@ -96,7 +91,6 @@ impl Cpu {
             y: 0,
             status: StatusFlag::Unused as u8,
             cycles: 0,
-            cycles_total: 0,
             interrupt: None,
         }
     }
@@ -116,11 +110,10 @@ impl Cpu {
                 self.cycles += cycles as usize;
             }
 
-            // trace!("PC:{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:08b} SP:{:02X}", self.pc, self.a, self.x, self.y, self.status, self.sp);
+            // log::trace!("PC:{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:08b} SP:{:02X}", self.pc, self.a, self.x, self.y, self.status, self.sp);
         }
 
         self.cycles -= 1;
-        self.cycles_total += 1;
     }
 
     /**

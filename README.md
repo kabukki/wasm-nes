@@ -11,7 +11,7 @@ A **NES** emulator written in Rust compiled to WebAssemly for usage on the web.
 - ✅ Central Processing Unit (Ricoh 2A03) 
 - ✅ Pixel Processing Unit
 - 🚧 Audio Processing Unit: Pulse, ~~triangle~~, ~~noise~~, ~~DMC~~.
-- ✅ Input devices (keyboard & controller)
+- ✅ Controller input
 - ✅ Cartridge [mappers](https://wiki.nesdev.com/w/index.php/Mapper): `NROM`, `MMC1`, `UxROM`, `CNROM`, `GxROM`.
 - ✅ Games saves via cartridge RAM
 

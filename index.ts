@@ -1,14 +1,8 @@
 import GameStats from 'game-stats';
+import throttle from 'lodash.throttle';
 
 import init, { Nes, set_panic_hook, set_log, fingerprint } from './pkg';
 import { Audio } from './audio';
-
-interface Options {
-    debugRate: number;
-    onError?: (err: Error) => void;
-    onDebug?: (info: any) => void;
-    onSave?: (save: Save) => void;
-}
 
 export enum Button {
     None    = 0b0000_0000,
@@ -20,12 +14,6 @@ export enum Button {
     Down    = 0b0010_0000,
     Left    = 0b0100_0000,
     Right   = 0b1000_0000,
-}
-
-export enum Status {
-    Idle,
-    Running,
-    Crashed,
 }
 
 export interface Save {
@@ -51,79 +39,62 @@ export async function getRom (file: File) {
     } as Rom;
 }
 
-export class Emulator {
+export class Emulator extends EventTarget {
     private vm: Nes;
     private rafHandle: ReturnType<typeof requestAnimationFrame>;
-    private saveHandle: ReturnType<typeof setInterval>;
-    private debugHandle: ReturnType<typeof setInterval>;
     private inputs: Uint8Array;
     private stats: GameStats;
     private audio: Audio;
-    public status: Status;
+    private context: CanvasRenderingContext2D;
+    private framebuffer: Uint8ClampedArray;
     public canvas: HTMLCanvasElement;
     public rom: Rom;
 
     constructor (canvas: HTMLCanvasElement, rom: Rom) {
-        this.vm = Nes.new(rom.buffer);
+        super();
+        this.audio = new Audio();
+        this.canvas = canvas;
+        this.context = this.canvas.getContext('2d');
+        this.framebuffer = new Uint8ClampedArray(4 * this.canvas.width * this.canvas.height);
+        this.rom = rom;
         this.inputs = new Uint8Array([0, 0]);
         this.stats = new GameStats();
-        this.status = Status.Idle;
-        this.canvas = canvas;
-        this.rom = rom;
-        this.audio = new Audio();
+        this.vm = Nes.new(rom.buffer, this.audio.sampleRate);
+        this.save = throttle(this.save.bind(this), 2000);
+        this.debug = throttle(this.debug.bind(this), 1000);
     }
 
-    start ({ onError, onDebug, onSave }: Options) {
-        const context = this.canvas.getContext('2d');
-        const framebuffer = new Uint8ClampedArray(4 * this.canvas.width * this.canvas.height);
+    async start () {
+        await this.audio.init();
         const rafCallback = (timestamp) => {
-            try {
-                this.vm.update_controllers(this.inputs);
-                this.vm.cycle_until_frame();
-                this.vm.get_framebuffer((framebuffer as unknown) as Uint8Array);
-                const audio = this.vm.get_audio(this.audio.sampleRate);
-                this.audio.queue(audio);
-                context.putImageData(new ImageData(framebuffer, this.canvas.width, this.canvas.height), 0, 0);
-                this.rafHandle = requestAnimationFrame(rafCallback);
-                this.stats.record(timestamp);
-            } catch (err) {
-                onError?.(err);
-                this.stop(err);
-            }
+            this.rafCallback(timestamp);
+            this.save();
+            this.debug();
+            this.rafHandle = requestAnimationFrame(rafCallback);
         };
-
-        if (onSave) {
-            this.saveHandle = setInterval(() => {
-                onSave(this.getSave());
-            }, 1000);
-        }
-
-        if (onDebug) {
-            this.debugHandle = setInterval(() => {
-                onDebug({
-                    stats: this.stats.stats(),
-                    ram: this.vm.get_ram(),
-                    oam: this.vm.get_oam(),
-                    // ram_nametables: this.vm.get_nametable_ram(),
-                    // ram_cartridge: this.vm.get_cartridge_ram(),    
-                    patternTables: this.vm.get_pattern_tables(),
-                    palettes: this.vm.get_palettes(),
-                    palette: this.vm.get_palette(),
-                });
-            }, 1000);
-        }
 
         this.rafHandle = requestAnimationFrame(rafCallback);
         this.audio.start();
-        this.status = Status.Running;
+    }
+
+    step () {
+        requestAnimationFrame((timestamp) => {
+            this.rafCallback(timestamp);
+            this.save();
+            this.debug();
+        });
     }
 
     stop (error?: Error) {
         this.audio.stop();
-        clearInterval(this.saveHandle);
-        clearInterval(this.debugHandle);
         cancelAnimationFrame(this.rafHandle);
-        this.status = error ? Status.Crashed : Status.Idle;
+        if (error) {
+            this.dispatchEvent(new CustomEvent('error', {
+                detail: {
+                    error,
+                },
+            }));
+        }
     }
 
     reset () {
@@ -136,17 +107,57 @@ export class Emulator {
         }
     }
 
-    getSave (): Save {
-        return {
+    loadSave (save: Save) {
+        this.vm.set_cartridge_ram(save.data);
+    }
+
+    private save () {
+        const save = {
             name: this.rom.name,
             date: new Date(),
             data: this.vm.get_cartridge_ram(),
             thumbnail: this.canvas.toDataURL(),
         };
+
+        this.dispatchEvent(new CustomEvent('save', {
+            detail: {
+                save,
+            },
+        }));
     }
 
-    loadSave (save: Save) {
-        this.vm.set_cartridge_ram(save.data);
+    private rafCallback (timestamp) {
+        try {
+            this.vm.update_controllers(this.inputs);
+            this.vm.cycle_until_frame();
+            this.vm.get_framebuffer((this.framebuffer as unknown) as Uint8Array);
+            this.audio.queue(this.vm.get_audio());
+            this.context.putImageData(new ImageData(this.framebuffer, this.canvas.width, this.canvas.height), 0, 0);
+            this.stats.record(timestamp);
+        } catch (err) {
+            this.stop(err);
+        }
+    }
+
+    private debug () {
+        const stats = this.stats.stats();
+        const audio = this.audio.debug();
+        const debug = this.vm.get_debug();
+
+        this.dispatchEvent(new CustomEvent('debug', {
+            detail: {
+                audio,
+                performance: {
+                    fps: stats.fpsAverage,
+                    delta: stats.deltaAverage,
+                    frame: stats.frame,
+                    timestamp: stats.timestamp,
+                },
+                time: debug.time,
+                cartridge: debug.cartridge,
+                ppu: debug.ppu,
+            },
+        }));
     }
 }
 

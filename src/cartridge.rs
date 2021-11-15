@@ -3,10 +3,11 @@
  */
 
 use wasm_bindgen::prelude::*;
-use log::debug;
 use std::io::prelude::*;
 use std::io::Cursor;
+use std::fmt;
 use crate::mapper::{Mapper, get_mapper};
+use crate::debug::Probe;
 
 pub const PRG_BANK_SIZE: usize = 0x4000; // 16 KiB
 pub const CHR_BANK_SIZE: usize = 0x2000; // 8 KiB
@@ -25,7 +26,6 @@ pub enum ControlFlag2 {
     Mapper      =   0b1111_0000, // Upper nibble of mapper number
 }
 
-#[wasm_bindgen]
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum Mirroring {
     OneScreenLower,
@@ -35,10 +35,31 @@ pub enum Mirroring {
     FourScreen,
 }
 
-#[derive(Debug, PartialEq)]
+impl fmt::Display for Mirroring {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Mirroring::OneScreenLower => write!(f, "One screen (lower)"),
+            Mirroring::OneScreenUpper => write!(f, "One screen (upper)"),
+            Mirroring::Horizontal => write!(f, "Horizontal"),
+            Mirroring::Vertical => write!(f, "Vertical"),
+            Mirroring::FourScreen => write!(f, "4-screen"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum ChrType {
     ROM,
     RAM,
+}
+
+impl fmt::Display for ChrType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ChrType::ROM => write!(f, "ROM"),
+            ChrType::RAM => write!(f, "RAM"),
+        }
+    }
 }
 
 pub struct Cartridge {
@@ -47,6 +68,7 @@ pub struct Cartridge {
     pub chr: Vec<u8>,
     mirroring: Mirroring,
     mapper: Box<dyn Mapper>,
+    debug: CartridgeDebug,
 }
 
 impl Cartridge {
@@ -71,14 +93,21 @@ impl Cartridge {
             (false, true) => Mirroring::Vertical,
         };
 
-        debug!("PRG banks: {}\nCHR banks: {} ({:?})\nMapper: {}\nRAM size: {}\nHas trainer ? {}\nMirroring: {:?}", prg_banks, chr_banks, chr_type, mapper, ram, trainer, mirroring);
-
         let mut cartridge = Cartridge {
             prg_ram: vec![0; std::cmp::max(ram, 1) * RAM_BANK_SIZE],
             prg_rom: vec![0; prg_banks * PRG_BANK_SIZE],
             chr: vec![0; std::cmp::max(chr_banks, 1) * CHR_BANK_SIZE], // No distinction between CHR ROM and RAM
             mirroring,
             mapper: get_mapper(mapper),
+            debug: CartridgeDebug {
+                prg_banks,
+                chr_banks,
+                chr_type,
+                mapper,
+                ram,
+                trainer,
+                mirroring,
+            },
         };
 
         if trainer {
@@ -127,5 +156,61 @@ impl Cartridge {
         }
 
         tile
+    }
+}
+
+impl Probe<CartridgeDebug> for Cartridge {
+    fn get_debug (&self, _cartridge: &Cartridge) -> CartridgeDebug {
+        self.debug.to_owned()
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct CartridgeDebug {
+    prg_banks: usize,
+    chr_banks: usize,
+    chr_type: ChrType,
+    mapper: u8,
+    trainer: bool,
+    ram: usize,
+    mirroring: Mirroring,
+}
+
+#[wasm_bindgen]
+impl CartridgeDebug {
+    #[wasm_bindgen(getter = prgBanks)]
+    pub fn prg_banks (&self) -> usize {
+        self.prg_banks
+    }
+
+    #[wasm_bindgen(getter = chrBanks)]
+    pub fn chr_banks (&self) -> usize {
+        self.chr_banks
+    }
+
+    #[wasm_bindgen(getter = chrType)]
+    pub fn chr_type (&self) -> String {
+        self.chr_type.to_string()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn mapper (&self) -> u8 {
+        self.mapper
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn trainer (&self) -> bool {
+        self.trainer
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn ram (&self) -> usize {
+        self.ram
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn mirroring (&self) -> String {
+        self.mirroring.to_string()
     }
 }

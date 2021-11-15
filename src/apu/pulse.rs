@@ -14,7 +14,7 @@ pub struct Pulse {
     id: u8,
     output: u8, // 0-15
     sequence: u8,
-    length: u8,
+    pub length: u8,
     length_halt: bool,
     timer: u16,
     timer_reload: u16, // Frequency (?)

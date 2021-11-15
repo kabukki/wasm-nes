@@ -3,6 +3,7 @@
         "target": "esnext",
         "declaration": true,
         "declarationDir": "dist",
-        "moduleResolution": "node"
+        "moduleResolution": "node",
+        "module": "esnext"
     }
 }

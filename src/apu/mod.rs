@@ -1,4 +1,5 @@
 use crate::apu::pulse::Pulse;
+use crate::cpu::{Cpu, Interrupt};
 
 pub mod pulse;
 
@@ -10,41 +11,55 @@ pub const LENGTH_TABLE: [u8; 32] = [
     12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30,
 ];
 
+pub enum StatusFlag {
+    DMCInterrupt    = 0b1000_0000,
+    FrameInterrupt  = 0b0100_0000,
+    DMC             = 0b0001_0000,
+    Noise           = 0b0000_1000,
+    Triangle        = 0b0000_0100,
+    Square2         = 0b0000_0010,
+    Square1         = 0b0000_0001,
+}
+
 /**
  * https://wiki.nesdev.org/w/index.php/APU
  */
 pub struct Apu {
+    status: u8,
     mode: u8,
+    irq_inhibit: bool,
     square_1: Pulse,
     square_2: Pulse,
     // triangle_1,
     // noise_1,
     // sample_1,
     buffer: Vec<f32>,
-    cycles: usize,
+    frame: usize,
 }
 
 impl Apu {
     pub fn new () -> Self {
         Self {
-            cycles: 0,
+            status: 0,
             mode: 0,
+            irq_inhibit: false,
+            frame: 0,
             square_1: Pulse::new(1),
             square_2: Pulse::new(2),
             buffer: vec![],
         }
     }
 
-    pub fn cycle (&mut self) {
+    pub fn cycle (&mut self, cpu: &mut Cpu) {
         self.square_1.cycle_timer();
         self.square_2.cycle_timer();
 
-        self.cycles += 1;
-        
+        self.frame += 1;
+
         // https://wiki.nesdev.org/w/index.php/APU_Frame_Counter
         match self.mode {
             0 => {
-                match self.cycles {
+                match self.frame {
                     3729 => {
                         self.square_1.cycle_envelope();
                         self.square_2.cycle_envelope();
@@ -62,20 +77,23 @@ impl Apu {
                         self.square_2.cycle_envelope();
                     },
                     14915 => {
-                        // e,l,irq
                         self.square_1.cycle_envelope();
                         self.square_1.cycle_length();
                         self.square_1.cycle_sweep();
                         self.square_2.cycle_envelope();
                         self.square_2.cycle_length();
                         self.square_2.cycle_sweep();
-                        self.cycles = 0;
+                        if !self.irq_inhibit {
+                            self.status |= StatusFlag::FrameInterrupt as u8;
+                            // cpu.interrupt_request(Interrupt::IRQ);
+                        }
+                        self.frame = 0;
                     },
                     _ => {},
                 }
             },
             1 => {
-                match self.cycles {
+                match self.frame {
                     3729 => {
                         self.square_1.cycle_envelope();
                         self.square_2.cycle_envelope();
@@ -93,24 +111,21 @@ impl Apu {
                         self.square_2.cycle_envelope();
                     },
                     18641 => {
-                        // e,l,irq
                         self.square_1.cycle_envelope();
                         self.square_1.cycle_length();
                         self.square_1.cycle_sweep();
                         self.square_2.cycle_envelope();
                         self.square_2.cycle_length();
                         self.square_2.cycle_sweep();
-                        self.cycles = 0;
+                        self.frame = 0;
                     },
                     _ => {},
                 }
             },
             _ => unreachable!(),
         }
-
-        self.buffer.push(self.mix());
     }
-    
+
     /**
      * https://wiki.nesdev.org/w/index.php/APU_Mixer
      */
@@ -120,20 +135,25 @@ impl Apu {
         pulse_output + tnd_output
     }
 
-    /**
-     * Extract the sample by applying a downsampling factor.
-     * The resulting output will contain (source.length / factor) samples.
-     * For simplicity, sample rate conversion is not done here.
-     */
-    pub fn flush (&mut self, factor: f32) -> Vec<f32> {
-        let buffer: Vec<f32> = self.buffer.iter().step_by(factor as usize).copied().collect();
+    pub fn sample (&mut self) {
+        self.buffer.push(self.mix());
+    }
+
+    pub fn flush (&mut self) -> Vec<f32> {
+        let buffer: Vec<f32> = self.buffer.to_vec();
         self.buffer.clear();
         buffer
     }
 
-    pub fn read (&self, address: u16) -> u8 {
+    pub fn read (&mut self, address: u16) -> u8 {
         match address {
-            0x4015 => 0,
+            0x4015 => {
+                let status = (if self.square_1.length > 0 { 1 } else { 0 })
+                    | (if self.square_2.length > 0 { 1 } else { 0 } << 1)
+                    | (if (self.status & StatusFlag::FrameInterrupt as u8) > 0 { 1 } else { 0 } << 6);
+                self.status &= !(StatusFlag::FrameInterrupt as u8);
+                status
+            },
             _ => panic!("Invalid APU read @ {:#x}", address),
         }
     }
@@ -165,10 +185,19 @@ impl Apu {
                 self.square_2.write_hi(data);
             },
             0x4015 => {
-                if (data & 1) > 0 { self.square_1.enable(); } else { self.square_1.disable(); }
-                if (data & 2) > 0 { self.square_2.enable(); } else { self.square_2.disable(); }
+                if (data & StatusFlag::Square1 as u8) > 0 { self.square_1.enable(); } else { self.square_1.disable(); }
+                if (data & StatusFlag::Square2 as u8) > 0 { self.square_2.enable(); } else { self.square_2.disable(); }
             },
-            0x4017 => {},
+            0x4017 => {
+                self.mode = (data & 0b1000_0000) >> 7;
+                self.irq_inhibit = (data & 0b0100_0000) > 0;
+
+                if self.irq_inhibit {
+                    self.status &= !(StatusFlag::FrameInterrupt as u8);
+                }
+
+                self.frame = 0;
+            },
             _ => {}, // panic!("Invalid APU write @ {:#x}", address),
         }
     }

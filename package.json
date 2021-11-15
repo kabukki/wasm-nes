@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "build:wasm": "wasm-pack build -t web --profiling --out-name index",
-    "build:js": "esbuild --bundle --outdir=dist --sourcemap --format=esm index.ts && tsc --emitDeclarationOnly && cp pkg/*.wasm dist",
+    "build:js": "esbuild --bundle --outdir=dist --sourcemap --format=esm index.ts processor.js && tsc --emitDeclarationOnly && cp pkg/*.wasm dist",
     "build": "npm run build:wasm && npm run build:js",
     "lint": "cargo clippy",
     "test": "cargo test",
@@ -18,6 +18,8 @@
     "typescript": "^4.3.5"
   },
   "dependencies": {
-    "game-stats": "^0.1.1"
+    "game-stats": "^0.1.1",
+    "lodash.throttle": "^4.1.1",
+    "ringbuf.js": "^0.1.0"
   }
 }

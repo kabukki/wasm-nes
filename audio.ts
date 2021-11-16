@@ -16,12 +16,16 @@ export class Audio {
         return this.ctx.sampleRate;
     }
 
+    get bufferSize () {
+        const length = 100; // ms
+        return length * this.ctx.sampleRate / 1000;
+    }
+
     async init () {
         if (!this.buffer) {
             await this.ctx.audioWorklet.addModule(new URL('processor.js', import.meta.url).href);
 
-            // 100ms buffer
-            const queue = RingBuffer.getStorageForCapacity(this.ctx.sampleRate / 10, Float32Array);
+            const queue = RingBuffer.getStorageForCapacity(this.bufferSize, Float32Array);
             const node = new AudioWorkletNode(this.ctx, 'processor', {
                 processorOptions: {
                     queue,

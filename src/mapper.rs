@@ -9,7 +9,7 @@ pub fn get_mapper (id: u8) -> Box<dyn Mapper> {
         3 => Box::new(Mapper003::default()),
         7 => Box::new(Mapper007::default()),
         66 => Box::new(Mapper066::default()),
-        _ => unimplemented!("Unsupported mapper"),
+        _ => unimplemented!("Unsupported mapper ({})", id),
     }
 }
 

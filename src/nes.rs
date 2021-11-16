@@ -114,6 +114,7 @@ impl Nes {
      */
     pub fn reset (&mut self) {
         self.cpu.reset();
+        self.bus.apu.reset();
         self.clock.reset();
     }
 

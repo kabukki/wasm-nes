@@ -15,9 +15,9 @@ pub struct Pulse {
     output: u8, // 0-15
     sequence: u8,
     pub length: u8,
-    length_halt: bool,
+    length_enabled: bool,
     timer: u16,
-    timer_reload: u16, // Frequency (?)
+    timer_reload: u16,
     volume: u8,
     volume_constant: u8,
     envelope_start: bool,
@@ -30,7 +30,6 @@ pub struct Pulse {
     sweep_reload: u8,
     sweep_shift: u8,
     sweep_enabled: bool,
-    enabled: bool,
 }
 
 impl Pulse {
@@ -40,7 +39,7 @@ impl Pulse {
             output: 0,
             sequence: 0,
             length: 0,
-            length_halt: false,
+            length_enabled: false,
             timer: 0,
             timer_reload: 0,
             volume: 0,
@@ -55,24 +54,21 @@ impl Pulse {
             sweep_reload: 0,
             sweep_shift: 0,
             sweep_enabled: false,
-            enabled: true,
         }
     }
 
     pub fn cycle_timer (&mut self) {
-        if self.enabled {
-            if self.timer == 0 {
-                self.sequence = self.sequence.rotate_right(1);
-                self.output = self.sequence & 1;
-                self.timer = self.timer_reload;
-            } else {
-                self.timer -= 1;
-            }
+        if self.timer == 0 {
+            self.sequence = self.sequence.rotate_right(1);
+            self.output = self.sequence & 1;
+            self.timer = self.timer_reload;
+        } else {
+            self.timer -= 1;
         }
     }
     
     pub fn cycle_length (&mut self) {
-        if !self.length_halt && self.length > 0 {
+        if self.length_enabled && self.length > 0 {
             self.length -= 1;
         }
     }
@@ -121,8 +117,8 @@ impl Pulse {
         let duty = (data & 0b1100_0000) >> 6;
 
         self.sequence = PULSE_TABLE[duty as usize];
-        self.length_halt = (data & 0b0010_0000) > 0;
-        self.envelope_loop = !self.length_halt;
+        self.length_enabled = (data & 0b0010_0000) == 0;
+        self.envelope_loop = (data & 0b0010_0000) > 0;
         self.envelope_enabled = (data & 0b0001_0000) == 0;
         self.envelope_timer_reload = data & 0b000_1111;
         self.volume_constant = data & 0b000_1111;
@@ -142,26 +138,24 @@ impl Pulse {
     }
 
     pub fn write_hi (&mut self, data: u8) {
-        self.length = LENGTH_TABLE[((data & 0b1111_1000) >> 3) as usize];
+        if self.length_enabled {
+            self.length = LENGTH_TABLE[((data & 0b1111_1000) >> 3) as usize];
+        }
         self.timer_reload = (self.timer_reload & 0x00FF) | (data as u16 & 0b0000_0111) << 8;
         self.timer = self.timer_reload;
         self.envelope_start = true;
     }
 
     pub fn output (&self) -> u8 {
-        if !self.enabled || self.length == 0 || self.timer_reload < 8 || self.timer_reload > 0x7FF { // Max. 11 bits
+        if self.length == 0 || self.timer_reload < 8 || self.timer_reload > 0x7FF { // Max. 11 bits
             0
         } else {
             self.output * if self.envelope_enabled { self.volume } else { self.volume_constant }
         }
     }
 
-    pub fn enable (&mut self) {
-        self.enabled = true;
-    }
-
     pub fn disable (&mut self) {
-        self.enabled = false;
+        self.length_enabled = false;
         self.length = 0;
     }
 }

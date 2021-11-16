@@ -4,9 +4,7 @@ A **NES** emulator written in Rust compiled to WebAssemly for usage on the web.
 
 > The Nintendo Entertainment System (NES) is an 8-bit third-generation home video game console produced by Nintendo. Nintendo first released it in Japan as the Family Computer, commonly known as the Famicom, in 1983. The NES, a remodelled version, was released internationally in the following years.
 
-## Current implementation status:
-
-### Features
+## Features
 
 - ✅ Central Processing Unit (Ricoh 2A03) 
 - ✅ Pixel Processing Unit
@@ -15,63 +13,137 @@ A **NES** emulator written in Rust compiled to WebAssemly for usage on the web.
 - ✅ Cartridge [mappers](https://wiki.nesdev.com/w/index.php/Mapper): `NROM`, `MMC1`, `UxROM`, `CNROM`, `GxROM`.
 - ✅ Games saves via cartridge RAM
 
-### Well-known tests
-
-Based on https://wiki.nesdev.com/w/index.php/Emulator_tests (available [here](https://github.com/christopherpow/nes-test-roms))
-
-#### CPU
-
-| Test                  | Status                |
-|-----------------------|-----------------------|
-| `branch_timing_tests` | ✅ Passed             |
-| `cpu_dummy_reads`     | ❌ Failed             |
-| `cpu_dummy_writes`    | ❌ 0/2                |
-| `cpu_exec_space`      | ❌ 0/2                |
-| `cpu_flag_concurrency`| -                     |
-| `cpu_interrupts_v2`   | ❌ Failed             |
-| `cpu_reset`           | ✅ 2/2                |
-| `cpu_timing_test6`    | ✅ Passed             |
-| `instr_misc`          | ✅ Passed             |
-| `instr_test_v5`       | ⚠️ 14/16              |
-| `nestest`             | ✅ Passed (official)  |
-
-#### PPU
-
-| Test                              | Status    |
-|-----------------------------------|-----------|
-| `blargg_ppu_tests_2005.09.15b`    | ⚠️ 3/5    |
-| `nmi_sync`                        | ❌ Failed |
-| `ntsc_torture`                    | -         |
-| `oam_read`                        | ✅ Passed |
-| `oam_stress`                      | ❌ Failed |
-| `oamtest3`                        | ❌ Failed |
-| `ppu_open_bus`                    | ❌ Decay not implemented  |
-| `ppu_read_buffer`                 | ❌ Failed |
-| `ppu_sprite_hit`                  | ⚠️ 2/10   |
-| `ppu_sprite_overflow`             | ❌ 0/5    |
-| `ppu_vbl_nmi`                     | ❌ 0/10   |
-| `scanline`                        | ❌ Failed |
-| `sprdma_and_dmc_dma`              | -         |
-| `sprite_overflow_tests`           | ⚠️ 3/5    |
-| `tvpassfail`                      | -         |
-
-#### APU
-
-| Test                  | Status    |
-|-----------------------|-----------|
-
-#### Mappers
-
-| Test                  | Status    |
-|-----------------------|-----------|
-| `Holy Mapperel`       | ❌ APU missing    |
-
 ### Weak points
 
 The emulator currently lacks in the following areas:
-- Precise PPU timing
 - Open bus behaviour is missing
+- Precise PPU timing
 - Some sprites are not displayed correctly
+
+## Tests
+
+Emulation accuracy is tested thanks to test ROMs taken from https://wiki.nesdev.com/w/index.php/Emulator_tests (available [here](https://github.com/christopherpow/nes-test-roms)), and inspired from http://tasvideos.org/EmulatorResources/NESAccuracyTests.html.
+Here is the summary of results, you can find details below.
+
+| Component | Passed    | Total     | %         |
+|-----------|-----------|-----------|-----------|
+| CPU       | 21        | 30        | 70%       |
+| PPU       | 10        | 41        | 24%       |
+| APU       | 3         | 18        | 17%       |
+| Mappers   | -         | -         | -         |
+| **Total** | **34**    | **89**    | **38%**   |
+
+### CPU
+
+| Test                                          | Status                |
+|-----------------------------------------------|-----------------------|
+| `branch_timing_tests/branch_basics`           | ✅ Passed             |
+| `branch_timing_tests/backward_branch`         | ✅ Passed             |
+| `branch_timing_tests/forward_branch`          | ✅ Passed             |
+| `cpu_dummy_reads`                             | ❌ Failed             |
+| `cpu_dummy_writes/cpu_dummy_writes_oam`       | ❌ Failed             |
+| `cpu_dummy_writes/cpu_dummy_writes_ppumem`    | ❌ Failed             |
+| `cpu_exec_space/test_cpu_exec_space_apu`      | ❌ Failed             |
+| `cpu_exec_space/test_cpu_exec_space_ppuio`    | ❌ Failed             |
+| `cpu_interrupts_v2`                           | ❌ Failed             |
+| `cpu_reset/ram_after_reset`                   | ✅ Passed             |
+| `cpu_reset/registers`                         | ✅ Passed             |
+| `cpu_timing_test6`                            | ✅ Passed             |
+| `instr_misc`                                  | ❌ Failed             |
+| `instr_test_v5/basics`                        | ✅ Passed             |
+| `instr_test_v5/implied`                       | ✅ Passed             |
+| `instr_test_v5/immediate`                     | ⚠️ Official only      |
+| `instr_test_v5/zero_page`                     | ⚠️ Official only      |
+| `instr_test_v5/zp_xy`                         | ⚠️ Official only      |
+| `instr_test_v5/absolute`                      | ⚠️ Official only      |
+| `instr_test_v5/abs_xy`                        | ⚠️ Official only      |
+| `instr_test_v5/ind_x`                         | ⚠️ Official only      |
+| `instr_test_v5/ind_y`                         | ⚠️ Official only      |
+| `instr_test_v5/branches`                      | ✅ Passed             |
+| `instr_test_v5/stack`                         | ✅ Passed             |
+| `instr_test_v5/jmp_jsr`                       | ✅ Passed             |
+| `instr_test_v5/rts`                           | ✅ Passed             |
+| `instr_test_v5/rti`                           | ✅ Passed             |
+| `instr_test_v5/brk`                           | ❌ Failed             |
+| `instr_test_v5/special`                       | ❌ Failed             |
+| `nestest`                                     | ⚠️ Official only      |
+
+### PPU
+
+| Test                                          | Status    |
+|-----------------------------------------------|-----------|
+| `blargg_ppu_tests_2005.09.15b/palette_ram`    | ✅ Passed |
+| `blargg_ppu_tests_2005.09.15b/sprite_ram`     | ✅ Passed |
+| `blargg_ppu_tests_2005.09.15b/vbl_clear_time` | ❌ Failed |
+| `blargg_ppu_tests_2005.09.15b/vram_access`    | ❌ Failed |
+| `nmi_sync/demo_ntsc`                          | ❌ Failed |
+| `oam_read`                                    | ✅ Passed |
+| `oam_stress`                                  | ❌ Failed |
+| `oamtest3`                                    | ❌ Failed |
+| `ppu_open_bus`                                | ❌ Decay not implemented  |
+| `ppu_read_buffer`                             | ❌ Failed |
+| `ppu_sprite_hit/basics`                       | ✅ Passed |
+| `ppu_sprite_hit/alignment`                    | ❌ Failed |
+| `ppu_sprite_hit/corners`                      | ❌ Failed |
+| `ppu_sprite_hit/flip`                         | ❌ Failed |
+| `ppu_sprite_hit/left_clip`                    | ❌ Failed |
+| `ppu_sprite_hit/right_edge`                   | ❌ Failed |
+| `ppu_sprite_hit/screen_bottom`                | ❌ Failed |
+| `ppu_sprite_hit/double_height`                | ✅ Passed |
+| `ppu_sprite_hit/timing`                       | ❌ Failed |
+| `ppu_sprite_hit/timing_order`                 | ❌ Failed |
+| `ppu_sprite_overflow/basics`                  | ❌ Failed |
+| `ppu_sprite_overflow/details`                 | ✅ Passed |
+| `ppu_sprite_overflow/timing`                  | ❌ Failed |
+| `ppu_sprite_overflow/obscure`                 | ❌ Failed |
+| `ppu_sprite_overflow/emulator`                | ❌ Failed |
+| `ppu_vbl_nmi/vbl_basics`                      | ✅ Passed |
+| `ppu_vbl_nmi/vbl_set_time`                    | ❌ Failed |
+| `ppu_vbl_nmi/vbl_clear_time`                  | ✅ Passed |
+| `ppu_vbl_nmi/nmi_control`                     | ❌ Failed |
+| `ppu_vbl_nmi/nmi_timing`                      | ❌ Failed |
+| `ppu_vbl_nmi/suppression`                     | ❌ Failed |
+| `ppu_vbl_nmi/nmi_on_timing`                   | ❌ Failed |
+| `ppu_vbl_nmi/nmi_off_timing`                  | ❌ Failed |
+| `ppu_vbl_nmi/even_odd_frames`                 | ✅ Passed |
+| `ppu_vbl_nmi/even_odd_timing`                 | ❌ Failed |
+| `sprdma_and_dmc_dma`                          | -         |
+| `sprite_overflow_tests/basics`                | ❌ Failed |
+| `sprite_overflow_tests/details`               | ✅ Passed |
+| `sprite_overflow_tests/timing`                | ❌ Failed |
+| `sprite_overflow_tests/obscure`               | ❌ Failed |
+| `sprite_overflow_tests/emulator`              | ❌ Failed |
+
+### APU
+
+| Test                          | Status    |
+|-------------------------------|-----------|
+| `apu_mixer/dmc`               | ❌ Failed |
+| `apu_mixer/noise`             | ❌ Failed |
+| `apu_mixer/square`            | ❌ Failed |
+| `apu_mixer/triangle`          | ❌ Failed |
+| `apu_reset/4015_cleared`      | ❌ Failed |
+| `apu_reset/4017_timing`       | ❌ Failed |
+| `apu_reset/4017_written`      | ✅ Passed |
+| `apu_reset/irq_flag_cleared`  | ✅ Passed |
+| `apu_reset/len_ctrs_enabled`  | ❌ Failed |
+| `apu_reset/works_immediately` | ❌ Failed |
+| `apu_test/len_ctr`            | ❌ Failed |
+| `apu_test/len_table`          | ❌ Failed |
+| `apu_test/irq_flag`           | ✅ Passed |
+| `apu_test/jitter`             | ❌ Failed |
+| `apu_test/len_timing`         | ❌ Failed |
+| `apu_test/irq_flag_timing`    | ❌ Failed |
+| `apu_test/dmc_basics`         | ❌ Failed |
+| `apu_test/dmc_rates`          | ❌ Failed |
+| ...                           | ...       |
+
+### Mappers
+
+| Test                  | Status    |
+|-----------------------|-----------|
+| `Holy Mapperel`       | -         |
+| ...                   | ...       |
 
 ## Development
 

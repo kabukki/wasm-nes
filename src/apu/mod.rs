@@ -7,8 +7,10 @@ pub mod pulse;
  * https://wiki.nesdev.org/w/index.php/APU_Length_Counter
  */
 pub const LENGTH_TABLE: [u8; 32] = [
-    10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14,
-    12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30,
+    10, 254, 20, 2, 40, 4, 80, 6,
+    160, 8, 60, 10, 14, 12, 26, 14,
+    12, 16, 24, 18, 48, 20, 96, 22,
+    192, 24, 72, 26, 16, 28, 32, 30,
 ];
 
 pub enum StatusFlag {
@@ -21,12 +23,18 @@ pub enum StatusFlag {
     Square1         = 0b0000_0001,
 }
 
+#[derive(PartialEq)]
+pub enum FrameCounterMode {
+    FourStep    = 0,
+    FiveStep    = 1,
+}
+
 /**
  * https://wiki.nesdev.org/w/index.php/APU
  */
 pub struct Apu {
     status: u8,
-    mode: u8,
+    mode: FrameCounterMode,
     irq_inhibit: bool,
     square_1: Pulse,
     square_2: Pulse,
@@ -41,7 +49,7 @@ impl Apu {
     pub fn new () -> Self {
         Self {
             status: 0,
-            mode: 0,
+            mode: FrameCounterMode::FourStep,
             irq_inhibit: false,
             frame: 0,
             square_1: Pulse::new(1),
@@ -58,7 +66,7 @@ impl Apu {
 
         // https://wiki.nesdev.org/w/index.php/APU_Frame_Counter
         match self.mode {
-            0 => {
+            FrameCounterMode::FourStep => {
                 match self.frame {
                     3729 => {
                         self.square_1.cycle_envelope();
@@ -92,7 +100,7 @@ impl Apu {
                     _ => {},
                 }
             },
-            1 => {
+            FrameCounterMode::FiveStep => {
                 match self.frame {
                     3729 => {
                         self.square_1.cycle_envelope();
@@ -122,8 +130,13 @@ impl Apu {
                     _ => {},
                 }
             },
-            _ => unreachable!(),
         }
+    }
+
+    pub fn reset (&mut self) {
+        self.status = 0;
+        self.frame = 0;
+        self.write(0x4015, 0);
     }
 
     /**
@@ -147,6 +160,7 @@ impl Apu {
 
     pub fn read (&mut self, address: u16) -> u8 {
         match address {
+            // Status
             0x4015 => {
                 let status = (if self.square_1.length > 0 { 1 } else { 0 })
                     | (if self.square_2.length > 0 { 1 } else { 0 } << 1)
@@ -160,6 +174,7 @@ impl Apu {
 
     pub fn write (&mut self, address: u16, data: u8) {
         match address {
+            // Pulse 1
             0x4000 => {
                 self.square_1.write_ctrl(data);
             },
@@ -172,6 +187,7 @@ impl Apu {
             0x4003 => {
                 self.square_1.write_hi(data);
             },
+            // Pulse 2
             0x4004 => {
                 self.square_2.write_ctrl(data);
             },
@@ -184,16 +200,27 @@ impl Apu {
             0x4007 => {
                 self.square_2.write_hi(data);
             },
+            // Status
             0x4015 => {
-                if (data & StatusFlag::Square1 as u8) > 0 { self.square_1.enable(); } else { self.square_1.disable(); }
-                if (data & StatusFlag::Square2 as u8) > 0 { self.square_2.enable(); } else { self.square_2.disable(); }
+                if (data & StatusFlag::Square1 as u8) == 0 { self.square_1.disable(); }
+                if (data & StatusFlag::Square2 as u8) == 0 { self.square_2.disable(); }
             },
+            // Frame counter
             0x4017 => {
-                self.mode = (data & 0b1000_0000) >> 7;
+                self.mode = if (data & 0b1000_0000) > 0 { FrameCounterMode::FiveStep } else { FrameCounterMode::FourStep };
                 self.irq_inhibit = (data & 0b0100_0000) > 0;
 
                 if self.irq_inhibit {
                     self.status &= !(StatusFlag::FrameInterrupt as u8);
+                }
+
+                if self.mode == FrameCounterMode::FiveStep {
+                    self.square_1.cycle_envelope();
+                    self.square_1.cycle_length();
+                    self.square_1.cycle_sweep();
+                    self.square_2.cycle_envelope();
+                    self.square_2.cycle_length();
+                    self.square_2.cycle_sweep();
                 }
 
                 self.frame = 0;

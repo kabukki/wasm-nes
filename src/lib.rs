@@ -26,12 +26,3 @@ pub fn set_panic_hook () {
 pub fn set_log () {
     console_log::init_with_level(log::Level::Trace).expect("Could not set up logger");
 }
-
-#[wasm_bindgen]
-pub fn fingerprint (data: Vec<u8>) -> String {
-    use std::hash::Hasher;
-
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    hasher.write(&data);
-    format!("{:x}", hasher.finish())
-}

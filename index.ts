@@ -1,8 +1,6 @@
-import GameStats from 'game-stats';
-import throttle from 'lodash.throttle';
+import { Emulator, Rom, Save, Video2D, AudioPCM } from '@kabukki/emukit';
 
-import init, { Nes, set_panic_hook, set_log, fingerprint } from './pkg';
-import { Audio } from './audio';
+import init, { Nes as VM, set_panic_hook, set_log } from './pkg';
 
 export enum Button {
     None    = 0b0000_0000,
@@ -16,89 +14,29 @@ export enum Button {
     Right   = 0b1000_0000,
 }
 
-export interface Save {
-    name: string;
-    date: Date;
-    data: Uint8Array;
-    thumbnail: string;
+export interface Options {
+    canvas: HTMLCanvasElement;
+    rom: Rom;
 }
 
-export interface Rom {
-    name: string;
-    buffer: Uint8Array;
-    fingerprint: string;
-}
-
-export async function getRom (file: File) {
-    const buffer = new Uint8Array(await file?.arrayBuffer());
-
-    return {
-        name: file.name,
-        buffer,
-        fingerprint: fingerprint(buffer),
-    } as Rom;
-}
-
-export class Emulator extends EventTarget {
-    private vm: Nes;
-    private rafHandle: ReturnType<typeof requestAnimationFrame>;
+export class Nes extends Emulator<AudioPCM, Video2D> {
+    public readonly rom: Rom;
+    private vm: any;
     private inputs: Uint8Array;
-    private stats: GameStats;
-    private audio: Audio;
-    private context: CanvasRenderingContext2D;
-    private framebuffer: Uint8ClampedArray;
-    public canvas: HTMLCanvasElement;
-    public rom: Rom;
 
-    constructor (canvas: HTMLCanvasElement, rom: Rom) {
-        super();
-        this.audio = new Audio();
-        this.canvas = canvas;
-        this.context = this.canvas.getContext('2d');
-        this.framebuffer = new Uint8ClampedArray(4 * this.canvas.width * this.canvas.height);
+    constructor ({ canvas, rom }: Options) {
+        super(new Video2D(canvas), new AudioPCM(100));
         this.rom = rom;
         this.inputs = new Uint8Array([0, 0]);
-        this.stats = new GameStats();
-        this.vm = Nes.new(rom.buffer, this.audio.sampleRate);
-        this.save = throttle(this.save.bind(this), 2000);
-        this.debug = throttle(this.debug.bind(this), 1000);
+        this.vm = VM.new(rom.buffer, this.audio.sampleRate);
     }
 
-    async start () {
+    async init () {
         await this.audio.init();
-        const rafCallback = (timestamp) => {
-            this.rafCallback(timestamp);
-            this.save();
-            this.debug();
-            this.rafHandle = requestAnimationFrame(rafCallback);
-        };
-
-        this.rafHandle = requestAnimationFrame(rafCallback);
-        this.audio.start();
     }
 
-    step () {
-        requestAnimationFrame((timestamp) => {
-            this.rafCallback(timestamp);
-            this.save();
-            this.debug();
-        });
-    }
-
-    stop (error?: Error) {
-        this.audio.stop();
-        cancelAnimationFrame(this.rafHandle);
-        if (error) {
-            this.dispatchEvent(new CustomEvent('error', {
-                detail: {
-                    error,
-                },
-            }));
-        }
-    }
-
-    reset () {
-        this.vm.reset();
+    loadSave (save: Save) {
+        this.vm.set_cartridge_ram(save.data);
     }
 
     input (index: number, input: number) {
@@ -107,57 +45,44 @@ export class Emulator extends EventTarget {
         }
     }
 
-    loadSave (save: Save) {
-        this.vm.set_cartridge_ram(save.data);
+    cycle () {
+        this.vm.update_controllers(this.inputs);
+        this.vm.cycle_until_frame();
+        this.vm.get_framebuffer((this.video.framebuffer as unknown) as Uint8Array);
+        this.video.paint();
+        this.audio.queue(this.vm.get_audio());
     }
 
-    private save () {
-        const save = {
+    reset () {
+        this.vm.reset();
+    }
+
+    save () {
+        return {
             name: this.rom.name,
             date: new Date(),
             data: this.vm.get_cartridge_ram(),
-            thumbnail: this.canvas.toDataURL(),
-        };
-
-        this.dispatchEvent(new CustomEvent('save', {
-            detail: {
-                save,
-            },
-        }));
+            thumbnail: this.video.screenshot(),
+        } as Save;
     }
 
-    private rafCallback (timestamp) {
-        try {
-            this.vm.update_controllers(this.inputs);
-            this.vm.cycle_until_frame();
-            this.vm.get_framebuffer((this.framebuffer as unknown) as Uint8Array);
-            this.audio.queue(this.vm.get_audio());
-            this.context.putImageData(new ImageData(this.framebuffer, this.canvas.width, this.canvas.height), 0, 0);
-            this.stats.record(timestamp);
-        } catch (err) {
-            this.stop(err);
-        }
-    }
-
-    private debug () {
+    debug () {
         const stats = this.stats.stats();
         const audio = this.audio.debug();
         const debug = this.vm.get_debug();
 
-        this.dispatchEvent(new CustomEvent('debug', {
-            detail: {
-                audio,
-                performance: {
-                    fps: stats.fpsAverage,
-                    delta: stats.deltaAverage,
-                    frame: stats.frame,
-                    timestamp: stats.timestamp,
-                },
-                time: debug.time,
-                cartridge: debug.cartridge,
-                ppu: debug.ppu,
+        return {
+            audio,
+            performance: {
+                fps: stats.fpsAverage,
+                delta: stats.deltaAverage,
+                frame: stats.frame,
+                timestamp: stats.timestamp,
             },
-        }));
+            time: debug.time,
+            cartridge: debug.cartridge,
+            ppu: debug.ppu,
+        };
     }
 }
 

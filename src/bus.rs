@@ -34,11 +34,11 @@ pub struct Bus {
 }
 
 impl Bus {
-    pub fn new () -> Bus {
+    pub fn new (sample_rate: f64) -> Bus {
         Bus {
             wram: [0; 0x800],
             ppu: Ppu::new(),
-            apu: Apu::new(),
+            apu: Apu::new(sample_rate),
             cartridge: None,
             dma: None,
             controllers: [Controller::new(); 2],
@@ -98,11 +98,5 @@ impl Bus {
                 cartridge.write_prg(address, data);
             },
         };
-    }
-}
-
-impl Default for Bus {
-    fn default () -> Self {
-        Bus::new()
     }
 }

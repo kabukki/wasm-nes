@@ -39,7 +39,7 @@ impl Pulse {
             output: 0,
             sequence: 0,
             length: 0,
-            length_enabled: false,
+            length_enabled: true,
             timer: 0,
             timer_reload: 0,
             volume: 0,
@@ -48,12 +48,12 @@ impl Pulse {
             envelope_timer: 0,
             envelope_timer_reload: 0,
             envelope_loop: false,
-            envelope_enabled: false,
+            envelope_enabled: true,
             sweep_timer: 0,
             sweep_negate: false,
             sweep_reload: 0,
             sweep_shift: 0,
-            sweep_enabled: false,
+            sweep_enabled: true,
         }
     }
 
@@ -152,6 +152,10 @@ impl Pulse {
         } else {
             self.output * if self.envelope_enabled { self.volume } else { self.volume_constant }
         }
+    }
+
+    pub fn enable (&mut self) {
+        self.length_enabled = true;
     }
 
     pub fn disable (&mut self) {

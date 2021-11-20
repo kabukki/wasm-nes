@@ -3,7 +3,7 @@ use crate::{
     debug::Probe,
     bus::Bus,
     cpu::Cpu,
-    clock::{Clock, ClockDivider},
+    clock::Clock,
     cartridge::CartridgeDebug,
     ppu::PpuDebug,
 };
@@ -13,10 +13,6 @@ pub struct Nes {
     cpu: Cpu,
     bus: Bus,
     clock: Clock,
-    clock_apu: ClockDivider,
-    clock_apu_sample: ClockDivider,
-    clock_cpu: ClockDivider,
-    clock_ppu: ClockDivider,
 }
 
 #[wasm_bindgen]
@@ -24,12 +20,8 @@ impl Nes {
     pub fn new (rom: Vec<u8>, sample_rate: f64) -> Self {
         let mut emulator = Nes {
             cpu: Cpu::new(),
-            bus: Bus::new(),
+            bus: Bus::new(sample_rate),
             clock: Clock::new(crate::clock::NTSC_CLOCK_MASTER),
-            clock_apu: ClockDivider::new(crate::clock::NTSC_CLOCK_APU),
-            clock_apu_sample: ClockDivider::new(sample_rate),
-            clock_cpu: ClockDivider::new(crate::clock::NTSC_CLOCK_CPU),
-            clock_ppu: ClockDivider::new(crate::clock::NTSC_CLOCK_PPU),
         };
 
         emulator.bus.load(&rom);
@@ -39,56 +31,12 @@ impl Nes {
     }
 
     /**
-     * Cycle once
+     * Run one master clock cycle
      */
     pub fn cycle (&mut self) {
-        // CPU
-        if self.clock_cpu.tick(self.clock.time) {
-            let mut dma = self.bus.dma;
-    
-            match dma {
-                Some (ref mut status) => {
-                    if status.wait {
-                        if self.clock_cpu.cycles % 2 == 1 {
-                            status.wait = false;
-                        }
-                    } else {
-                        // Copy 256 bytes over 512 cycles
-                        if self.clock_cpu.cycles % 2 == 0 {
-                            let address = ((status.page as u16) << 8) + status.count as u16;
-                            status.read_buffer = self.bus.read(address);
-                        } else {
-                            self.bus.ppu.write_oam(status.read_buffer);
-    
-                            if status.count < u8::MAX {
-                                status.count += 1;
-                            } else {
-                                dma = None;
-                            }
-                        }
-                    }
-    
-                    self.bus.dma = dma;
-                },    
-                None => {
-                    self.cpu.cycle(&mut self.bus);
-                },
-            }
-        }
-
-        // APU
-        if self.clock_apu.tick(self.clock.time) {
-            self.bus.apu.cycle(&mut self.cpu);
-        }
-
-        if self.clock_apu_sample.tick(self.clock.time) {
-            self.bus.apu.sample();
-        }
-
-        // PPU
-        if self.clock_ppu.tick(self.clock.time) {
-            self.bus.ppu.cycle(&self.bus.cartridge.as_ref().unwrap(), &mut self.cpu);
-        }
+        self.cpu.tick(self.clock.time, &mut self.bus);
+        self.bus.apu.tick(self.clock.time, &mut self.cpu);
+        self.bus.ppu.tick(self.clock.time, &self.bus.cartridge.as_ref().unwrap(), &mut self.cpu);
 
         self.clock.tick();
     }
@@ -145,9 +93,9 @@ impl Nes {
             ram: self.bus.wram.to_vec(),
             time: TimeDebug {
                 time: self.clock.time,
-                cpu_cycles: self.clock_cpu.cycles,
-                ppu_cycles: self.clock_ppu.cycles,
-                apu_cycles: self.clock_apu.cycles,
+                cpu_cycles: self.cpu.clock.cycles,
+                ppu_cycles: self.bus.ppu.clock.cycles,
+                apu_cycles: self.bus.apu.clock.cycles,
             },
             ppu: self.bus.ppu.get_debug(cartridge),
             cartridge: cartridge.get_debug(cartridge),

@@ -1,5 +1,8 @@
-use crate::apu::pulse::Pulse;
-use crate::cpu::{Cpu, Interrupt};
+use crate::{
+    apu::pulse::Pulse,
+    cpu::{Cpu, Interrupt},
+    clock::ClockDivider,
+};
 
 pub mod pulse;
 
@@ -43,28 +46,49 @@ pub struct Apu {
     // sample_1,
     buffer: Vec<f32>,
     frame: usize,
+    pub clock: ClockDivider,
+    pub clock_sample: ClockDivider,
 }
 
 impl Apu {
-    pub fn new () -> Self {
+    pub fn new (sample_rate: f64) -> Self {
         Self {
             status: 0,
-            mode: FrameCounterMode::FourStep,
+            mode: FrameCounterMode::FiveStep,
             irq_inhibit: false,
-            frame: 0,
             square_1: Pulse::new(1),
             square_2: Pulse::new(2),
             buffer: vec![],
+            frame: 0,
+            clock: ClockDivider::new(crate::clock::NTSC_CLOCK_CPU),
+            clock_sample: ClockDivider::new(sample_rate),
+        }
+    }
+
+    pub fn tick (&mut self, time: f64, cpu: &mut Cpu) {
+        if self.clock.tick(time) {
+            self.cycle(cpu);
+        }
+
+        if self.clock_sample.tick(time) {
+            self.sample();
         }
     }
 
     pub fn cycle (&mut self, cpu: &mut Cpu) {
-        self.square_1.cycle_timer();
-        self.square_2.cycle_timer();
+        if self.clock.cycles % 2 == 0 {
+            self.square_1.cycle_timer();
+            self.square_2.cycle_timer();
+            self.frame += 1;
 
-        self.frame += 1;
+            self.cycle_frame(cpu);
+        }
+    }
 
-        // https://wiki.nesdev.org/w/index.php/APU_Frame_Counter
+    /**
+     * https://wiki.nesdev.org/w/index.php/APU_Frame_Counter
+     */
+    pub fn cycle_frame (&mut self, cpu: &mut Cpu) {
         match self.mode {
             FrameCounterMode::FourStep => {
                 match self.frame {
@@ -93,7 +117,7 @@ impl Apu {
                         self.square_2.cycle_sweep();
                         if !self.irq_inhibit {
                             self.status |= StatusFlag::FrameInterrupt as u8;
-                            // cpu.interrupt_request(Interrupt::IRQ);
+                            cpu.interrupt_request(Interrupt::IRQ);
                         }
                         self.frame = 0;
                     },
@@ -148,10 +172,16 @@ impl Apu {
         pulse_output + tnd_output
     }
 
+    /**
+     * Collect a sound sample and append it to the buffer
+     */
     pub fn sample (&mut self) {
         self.buffer.push(self.mix());
     }
 
+    /**
+     * Flush the sound sample buffer and returns its content
+     */
     pub fn flush (&mut self) -> Vec<f32> {
         let buffer: Vec<f32> = self.buffer.to_vec();
         self.buffer.clear();
@@ -202,8 +232,8 @@ impl Apu {
             },
             // Status
             0x4015 => {
-                if (data & StatusFlag::Square1 as u8) == 0 { self.square_1.disable(); }
-                if (data & StatusFlag::Square2 as u8) == 0 { self.square_2.disable(); }
+                if (data & StatusFlag::Square1 as u8) > 0 { self.square_1.enable(); } else { self.square_1.disable(); }
+                if (data & StatusFlag::Square2 as u8) > 0 { self.square_2.enable(); } else { self.square_2.disable(); }
             },
             // Frame counter
             0x4017 => {

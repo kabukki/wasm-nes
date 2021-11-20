@@ -5,12 +5,10 @@
 pub const NTSC_CLOCK_MASTER: f64    = 21_477_272.0;
 pub const NTSC_CLOCK_PPU: f64       = NTSC_CLOCK_MASTER / 4.0;
 pub const NTSC_CLOCK_CPU: f64       = NTSC_CLOCK_MASTER / 12.0;
-pub const NTSC_CLOCK_APU: f64       = NTSC_CLOCK_MASTER / 24.0;
 
 pub const PAL_CLOCK_MASTER: f64     = 26_601_712.5;
 pub const PAL_CLOCK_PPU: f64        = PAL_CLOCK_MASTER / 5.0;
 pub const PAL_CLOCK_CPU: f64        = PAL_CLOCK_MASTER / 16.0;
-pub const PAL_CLOCK_APU: f64        = PAL_CLOCK_MASTER / 32.0;
 
 pub struct Clock {
     pub rate: f64,

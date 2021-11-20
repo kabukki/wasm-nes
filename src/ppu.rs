@@ -17,6 +17,7 @@ use crate::{
     tilemap::Tilemap,
     cpu::{Cpu, Interrupt},
     cartridge::{Cartridge, Mirroring},
+    clock::ClockDivider,
 };
 
 pub enum CtrlFlag {
@@ -96,7 +97,8 @@ pub struct Ppu {
     pub framebuffer: Box<[u8; 256 * 240 * 4]>, // 512x480 -> 256x240 (32x30 = 960 tiles)
     pub frame: usize,
     read_buffer: u8,
-    
+    pub clock: ClockDivider,
+
     // Background
     cur_address: u16, // loopy_v
     tmp_address: u16, // loopy_t, top-left corner
@@ -137,6 +139,7 @@ impl Ppu {
             framebuffer: Box::new([0; 256 * 240 * 4]),
             frame: 0,
             read_buffer: 0,
+            clock: ClockDivider::new(crate::clock::NTSC_CLOCK_PPU),
             cur_address: 0,
             tmp_address: 0,
             scroll_x_fine: 0,
@@ -158,7 +161,13 @@ impl Ppu {
             sprite_shift_hi: [0; 8],
             sprite_shift_lo: [0; 8],
             sprite_attributes: [0; 8],
-            sprite_offsets: [0; 8],        
+            sprite_offsets: [0; 8],      
+        }
+    }
+
+    pub fn tick (&mut self, time: f64, cartridge: &Cartridge, cpu: &mut Cpu) {
+        if self.clock.tick(time) {
+            self.cycle(cartridge, cpu);
         }
     }
 

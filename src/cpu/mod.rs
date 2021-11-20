@@ -1,6 +1,11 @@
 use log::warn;
-use crate::bus::Bus;
-use crate::instruction::INSTRUCTIONS;
+use crate::{
+    bus::Bus,
+    clock::ClockDivider,
+};
+
+pub mod instruction;
+pub mod disassembly;
 
 // https://wiki.nesdev.com/w/index.php/CPU_interrupts
 
@@ -9,20 +14,9 @@ pub const MEMORY_RAM_STACK_START: u16 = 0x100;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Interrupt {
-    /**
-     * Non-maskable interrupt
-     */
-    NMI = 0xFFFA,
-
-    /**
-     * Maskable interrupt
-     */
-    IRQ = 0xFFFE,
-
-    /**
-     * System reset
-     */
-    RESET = 0xFFFC,
+    NMI     = 0xFFFA, // Non-maskable interrupt
+    IRQ     = 0xFFFE, // Maskable interrupt
+    RESET   = 0xFFFC, // System reset
 }
 
 pub enum StatusFlag {
@@ -40,45 +34,15 @@ pub enum StatusFlag {
  * MOS 6502 CPU
  */
 pub struct Cpu {
-    /**
-     * Program counter
-     */
     pub pc: u16,
-
-    /**
-     * Stack pointer
-     */
     pub sp: u8,
-
-    /**
-     * A register
-     */
     pub a: u8,
-
-    /**
-     * X register
-     */
     pub x: u8,
-    
-    /**
-     * Y register
-     */
     pub y: u8,
-
-    /**
-     * Status register
-     */
     pub status: u8,
-
-    /**
-     * Reamaining cycles
-     */
     pub cycles: usize,
-
-    /**
-     * Pending interrupt
-     */
     pub interrupt: Option<Interrupt>,
+    pub clock: ClockDivider,
 }
 
 impl Cpu {
@@ -92,6 +56,42 @@ impl Cpu {
             status: StatusFlag::Unused as u8,
             cycles: 0,
             interrupt: None,
+            clock: ClockDivider::new(crate::clock::NTSC_CLOCK_CPU),
+        }
+    }
+
+    pub fn tick (&mut self, time: f64, bus: &mut Bus) {
+        if self.clock.tick(time) {
+            let mut dma = bus.dma;
+    
+            match dma {
+                Some (ref mut status) => {
+                    if status.wait {
+                        if self.clock.cycles % 2 == 1 {
+                            status.wait = false;
+                        }
+                    } else {
+                        // Copy 256 bytes over 512 cycles
+                        if self.clock.cycles % 2 == 0 {
+                            let address = ((status.page as u16) << 8) + status.count as u16;
+                            status.read_buffer = bus.read(address);
+                        } else {
+                            bus.ppu.write_oam(status.read_buffer);
+    
+                            if status.count < u8::MAX {
+                                status.count += 1;
+                            } else {
+                                dma = None;
+                            }
+                        }
+                    }
+    
+                    bus.dma = dma;
+                },
+                None => {
+                    self.cycle(bus);
+                },
+            }
         }
     }
 
@@ -104,28 +104,11 @@ impl Cpu {
                 self.interrupt(self.interrupt.unwrap(), bus);
                 self.interrupt = None;
             } else {
-                let instruction = &INSTRUCTIONS[bus.read(self.pc) as usize];
-                self.pc += 1;
-                let cycles = instruction.execute(self, bus);
-                self.cycles += cycles as usize;
+                self.execute(bus);
             }
-
-            // log::trace!("PC:{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:08b} SP:{:02X}", self.pc, self.a, self.x, self.y, self.status, self.sp);
         }
 
         self.cycles -= 1;
-    }
-
-    /**
-     * Runs cycles until next instruction
-     */
-    pub fn cycle_full (&mut self, bus: &mut Bus) {
-        loop {
-            self.cycle(bus);
-            if self.cycles == 0 {
-                break;
-            }
-        }
     }
 
     pub fn push_stack (&mut self, bus: &mut Bus, data: u8) {
@@ -151,8 +134,7 @@ impl Cpu {
     }
 
     pub fn interrupt (&mut self, interrupt: Interrupt, bus: &mut Bus) {
-        // info!("INTERRUPT {:?}", interrupt);
-
+        // println!("INTERRUPT {:?}", interrupt);
         match interrupt {
             Interrupt::NMI | Interrupt::IRQ => {
                 if self.get_flag(StatusFlag::DisableInterrupt) && interrupt == Interrupt::IRQ {
@@ -180,21 +162,8 @@ impl Cpu {
     pub fn interrupt_request (&mut self, interrupt: Interrupt) {
         self.interrupt = Some(interrupt);
     }
-    
+
     pub fn reset (&mut self) {
         self.interrupt_request(Interrupt::RESET);
-    }
-}
-
-impl std::fmt::Debug for Cpu {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // write!(f, "PC = {:#x}, A = {}, X = {}, Y = {}, Status = {:#010b}", self.pc, self.a, self.x, self.y, self.status)
-        write!(f, "{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{}", self.pc, self.a, self.x, self.y, self.status, self.sp, self.cycles)
-    }
-}
-
-impl Default for Cpu {
-    fn default () -> Self {
-        Cpu::new()
     }
 }

@@ -91,14 +91,17 @@ impl Nes {
 
         NesDebug {
             ram: self.bus.wram.to_vec(),
-            time: TimeDebug {
-                time: self.clock.time,
-                cpu_cycles: self.cpu.clock.cycles,
-                ppu_cycles: self.bus.ppu.clock.cycles,
-                apu_cycles: self.bus.apu.clock.cycles,
-            },
             ppu: self.bus.ppu.get_debug(cartridge),
             cartridge: cartridge.get_debug(cartridge),
+        }
+    }
+
+    pub fn get_debug_time (&mut self) -> TimeDebug {
+        TimeDebug {
+            time: self.clock.time,
+            cpu_cycles: self.cpu.clock.cycles,
+            ppu_cycles: self.bus.ppu.clock.cycles,
+            apu_cycles: self.bus.apu.clock.cycles,
         }
     }
 }
@@ -106,7 +109,6 @@ impl Nes {
 #[wasm_bindgen]
 pub struct NesDebug {
     ram: Vec<u8>,
-    time: TimeDebug,
     ppu: PpuDebug,
     cartridge: CartridgeDebug,
 }
@@ -116,11 +118,6 @@ impl NesDebug {
     #[wasm_bindgen(getter)]
     pub fn ram (&self) -> Vec<u8> {
         self.ram.to_owned()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn time (&self) -> TimeDebug {
-        self.time.to_owned()
     }
 
     #[wasm_bindgen(getter)]

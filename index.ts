@@ -51,6 +51,7 @@ export class Nes extends Emulator<AudioPCM, Video2D> {
         this.vm.get_framebuffer((this.video.framebuffer as unknown) as Uint8Array);
         this.video.paint();
         this.audio.queue(this.vm.get_audio());
+        this.emit('frame', this.debugFrame());
     }
 
     reset () {
@@ -66,20 +67,27 @@ export class Nes extends Emulator<AudioPCM, Video2D> {
         } as Save;
     }
 
-    debug () {
-        const stats = this.stats.stats();
+    debugFrame () {
         const audio = this.audio.debug();
-        const debug = this.vm.get_debug();
+        const stats = this.stats.stats();
+        const time = this.vm.get_debug_time();
 
         return {
             audio,
             performance: {
-                fps: stats.fpsAverage,
-                delta: stats.deltaAverage,
+                fps: stats.fpsAverage || stats.fps,
+                delta: stats.deltaAverage || stats.delta,
                 frame: stats.frame,
                 timestamp: stats.timestamp,
             },
-            time: debug.time,
+            time,
+        }
+    }
+
+    debug () {
+        const debug = this.vm.get_debug();
+
+        return {
             cartridge: debug.cartridge,
             ppu: debug.ppu,
         };

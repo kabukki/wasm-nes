@@ -2,12 +2,14 @@ use wasm_nes::nes::Nes;
 
 macro_rules! run {
     ($path:expr) => {
+        use colored::Colorize;
+
         match crate::run(include_bytes!($path)) {
-            Ok (_) => {
-                println!("Passed !");
+            Ok (message) => {
+                println!("{}", message.green());
             },
             Err ((code, message)) => {
-                println!("{}", message);
+                println!("{}", message.red());
                 panic!("Failed ({:02X})", code);
             },
         }
@@ -30,7 +32,7 @@ fn read_string (nes: &mut Nes) -> String {
     String::from_utf8(bytes).unwrap()
 }
 
-fn run (rom: &[u8]) -> Result<(), (u8, String)> {
+fn run (rom: &[u8]) -> Result<String, (u8, String)> {
     let mut nes = Nes::new(rom.to_vec(), 48_000.0);
 
     loop {
@@ -40,7 +42,7 @@ fn run (rom: &[u8]) -> Result<(), (u8, String)> {
         if &[nes.read(0x6001), nes.read(0x6002), nes.read(0x6003)] == &[0xDE, 0xB0, 0x61] {
             match nes.read(0x6000) {
                 0x00 => {
-                    return Ok(())
+                    return Ok(read_string(&mut nes))
                 },
                 0x80 => {}, // Running
                 0x81 => {

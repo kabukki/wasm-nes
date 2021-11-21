@@ -1,6 +1,6 @@
 use crate::{
     apu::pulse::Pulse,
-    cpu::{Cpu, Interrupt},
+    cpu::{Cpu, /* Interrupt */},
     clock::ClockDivider,
 };
 
@@ -88,7 +88,7 @@ impl Apu {
     /**
      * https://wiki.nesdev.org/w/index.php/APU_Frame_Counter
      */
-    pub fn cycle_frame (&mut self, cpu: &mut Cpu) {
+    pub fn cycle_frame (&mut self, _cpu: &mut Cpu) {
         match self.mode {
             FrameCounterMode::FourStep => {
                 match self.frame {
@@ -117,7 +117,7 @@ impl Apu {
                         self.square_2.cycle_sweep();
                         if !self.irq_inhibit {
                             self.status |= StatusFlag::FrameInterrupt as u8;
-                            cpu.interrupt_request(Interrupt::IRQ);
+                            // cpu.interrupt_request(Interrupt::IRQ);
                         }
                         self.frame = 0;
                     },

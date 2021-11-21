@@ -11,7 +11,7 @@
     "build:types": "tsc --emitDeclarationOnly",
     "build": "npm run build:wasm && npm run build:lib && npm run build:types",
     "lint": "cargo clippy",
-    "test": "cargo test",
+    "test": "cargo test -- --show-output",
     "prepack": "npm run build"
   },
   "devDependencies": {

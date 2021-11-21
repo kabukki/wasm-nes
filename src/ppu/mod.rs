@@ -11,14 +11,14 @@
  * http://wiki.nesdev.com/w/index.php/PPU_nametables
  */
 
-use wasm_bindgen::{prelude::*, Clamped};
 use crate::{
-    debug::Probe,
-    tilemap::Tilemap,
     cpu::{Cpu, Interrupt},
     cartridge::{Cartridge, Mirroring},
     clock::ClockDivider,
 };
+
+pub mod tilemap;
+pub mod debug;
 
 pub enum CtrlFlag {
     Nametable       = 0b0000_0011,  // Nametable select
@@ -772,106 +772,6 @@ impl Ppu {
             0 => address % 0x10,
             _ => address % 0x20,
         } + 0x3F00;
-    }
-
-    /**
-     * Get the contents of the CHR-ROM pattern tables.
-     * Pattern tables contain background graphics (right) and sprite graphics (left)
-     * https://wiki.nesdev.com/w/index.php/PPU_pattern_tables
-     */
-    fn get_pattern_tables (&self, cartridge: &Cartridge) -> Vec<u8> {
-        let mut map = Tilemap::new(16, 32);
-        let palette = &self.palettes[..4];
-    
-        for n in 0..512 {
-            let x = n % 16;
-            let y = n / 16;
-
-            let tile = cartridge.get_tile(n);
-            map.write_tile(x, y, tile.as_slice(), palette);
-        }
-    
-        map.buffer
-    }
-
-    /**
-     * Get the palettes in use
-     */
-    fn get_palettes (&self) -> Vec<u8> {
-        let mut map = Tilemap::new(16, 2);
-
-        for n in 0..32 {
-            let color = self.palettes[n];
-            let x = n % 16;
-            let y = n / 16;
-            let tile = vec![0; 8 * 8];
-            map.write_tile(x, y, tile.as_slice(), &[color]);
-        }
-
-        map.buffer
-    }
-
-    /**
-     * Get the system palette
-     */
-    fn get_palette (&self) -> Vec<u8> {
-        let mut map = Tilemap::new(16, 4);
-
-        for color in 0..64 {
-            let tile = vec![0; 8 * 8];
-            map.write_tile(color % 16, color / 16, tile.as_slice(), &[color as u8]);
-        }
-
-        map.buffer
-    }
-}
-
-impl Default for Ppu {
-    fn default () -> Self {
-        Ppu::new()
-    }
-}
-
-impl Probe<PpuDebug> for Ppu {
-    fn get_debug (&self, cartridge: &Cartridge) -> PpuDebug {
-        PpuDebug {
-            oam: self.oam.to_vec(),
-            pattern_tables: self.get_pattern_tables(cartridge),
-            palettes: self.get_palettes(),
-            palette: self.get_palette(),
-        }
-    }
-}
-
-#[wasm_bindgen]
-#[derive(Clone)]
-pub struct PpuDebug {
-    oam: Vec<u8>,
-    pattern_tables: Vec<u8>,
-    palettes: Vec<u8>,
-    palette: Vec<u8>,
-}
-
-#[wasm_bindgen]
-impl PpuDebug {
-    #[wasm_bindgen(getter)]
-    pub fn oam (&self) -> Vec<u8> {
-        self.oam.to_owned()
-    }
-
-    #[wasm_bindgen(getter = patternTables)]
-    pub fn pattern_tables (&self) -> Clamped<Vec<u8>> {
-        Clamped(self.pattern_tables.to_owned())
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn palettes (&self) -> Clamped<Vec<u8>> {
-        Clamped(self.palettes.to_owned())
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn palette (&self) -> Clamped<Vec<u8>> {
-        Clamped(self.palette.to_owned())
     }
 }
 

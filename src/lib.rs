@@ -5,7 +5,6 @@ pub mod bus;
 pub mod cartridge;
 pub mod cpu;
 pub mod ppu;
-pub mod tilemap;
 pub mod controller;
 pub mod apu;
 pub mod clock;

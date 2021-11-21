@@ -5,7 +5,7 @@ use crate::{
     cpu::Cpu,
     clock::Clock,
     cartridge::debug::CartridgeDebug,
-    ppu::PpuDebug,
+    ppu::debug::PpuDebug,
 };
 
 #[wasm_bindgen]

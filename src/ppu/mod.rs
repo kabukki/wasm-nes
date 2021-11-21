@@ -736,7 +736,7 @@ impl Ppu {
      */
     pub fn write_oam (&mut self, data: u8) {
         self.oam[self.oam_address as usize] = data;
-        self.oam_address += 1;
+        self.oam_address = self.oam_address.wrapping_add(1);
     }
 
     /**

@@ -66,6 +66,10 @@ impl Nes {
         self.clock.reset();
     }
 
+    pub fn read (&mut self, address: u16) -> u8 {
+        self.bus.read(address)
+    }
+
     pub fn get_framebuffer (&self, buffer: &mut [u8]) {
         buffer.copy_from_slice(&self.bus.ppu.framebuffer.to_vec());
     }

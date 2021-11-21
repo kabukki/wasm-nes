@@ -74,8 +74,8 @@ fn nestest () {
 
         let state = State::from_str(&log[n]);
 
-        println!("{} EXPECTED  PC:{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:08b} SP:{:02X} PPU:---,--- CYC:{}", n, state.pc, state.a, state.x, state.y, state.status, state.sp, state.cycles);
-        println!("{} ACTUAL    PC:{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:08b} SP:{:02X} PPU:---,--- CYC:{}", n, cpu.pc, cpu.a, cpu.x, cpu.y, cpu.status, cpu.sp, cycles);
+        println!("{} EXPECTED  PC:{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:08b} SP:{:02X} PPU:---,--- CYC:{}", n + 1, state.pc, state.a, state.x, state.y, state.status, state.sp, state.cycles);
+        println!("{} ACTUAL    PC:{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:08b} SP:{:02X} PPU:---,--- CYC:{}", n + 1, cpu.pc, cpu.a, cpu.x, cpu.y, cpu.status, cpu.sp, cycles);
 
         assert_eq!(state.pc, cpu.pc, "PC differ");
         assert_eq!(state.a, cpu.a, "A registers differ");

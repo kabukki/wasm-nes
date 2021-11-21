@@ -2,12 +2,16 @@
  * iNES format http://wiki.nesdev.com/w/index.php/INES
  */
 
-use wasm_bindgen::prelude::*;
 use std::io::prelude::*;
 use std::io::Cursor;
 use std::fmt;
-use crate::mapper::{Mapper, get_mapper};
-use crate::debug::Probe;
+use crate::cartridge::{
+    mapper::{Mapper, get_mapper},
+    debug::CartridgeDebug,
+};
+
+pub mod mapper;
+pub mod debug;
 
 pub const PRG_BANK_SIZE: usize = 0x4000; // 16 KiB
 pub const CHR_BANK_SIZE: usize = 0x2000; // 8 KiB
@@ -156,61 +160,5 @@ impl Cartridge {
         }
 
         tile
-    }
-}
-
-impl Probe<CartridgeDebug> for Cartridge {
-    fn get_debug (&self, _cartridge: &Cartridge) -> CartridgeDebug {
-        self.debug.to_owned()
-    }
-}
-
-#[wasm_bindgen]
-#[derive(Clone)]
-pub struct CartridgeDebug {
-    prg_banks: usize,
-    chr_banks: usize,
-    chr_type: ChrType,
-    mapper: u8,
-    trainer: bool,
-    ram: usize,
-    mirroring: Mirroring,
-}
-
-#[wasm_bindgen]
-impl CartridgeDebug {
-    #[wasm_bindgen(getter = prgBanks)]
-    pub fn prg_banks (&self) -> usize {
-        self.prg_banks
-    }
-
-    #[wasm_bindgen(getter = chrBanks)]
-    pub fn chr_banks (&self) -> usize {
-        self.chr_banks
-    }
-
-    #[wasm_bindgen(getter = chrType)]
-    pub fn chr_type (&self) -> String {
-        self.chr_type.to_string()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn mapper (&self) -> u8 {
-        self.mapper
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn trainer (&self) -> bool {
-        self.trainer
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn ram (&self) -> usize {
-        self.ram
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn mirroring (&self) -> String {
-        self.mirroring.to_string()
     }
 }

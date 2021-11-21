@@ -3,7 +3,6 @@ use wee_alloc::WeeAlloc;
 
 pub mod bus;
 pub mod cartridge;
-pub mod mapper;
 pub mod cpu;
 pub mod ppu;
 pub mod tilemap;

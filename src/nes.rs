@@ -4,7 +4,7 @@ use crate::{
     bus::Bus,
     cpu::Cpu,
     clock::Clock,
-    cartridge::CartridgeDebug,
+    cartridge::debug::CartridgeDebug,
     ppu::PpuDebug,
 };
 

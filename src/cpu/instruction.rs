@@ -423,7 +423,7 @@ impl Cpu {
             (AddressingMode::Implied,       Operand::None)              => (Operand::None, false),
             (AddressingMode::Accumulator,   Operand::None)              => (Operand::Byte(self.a), false),
             (AddressingMode::Immediate,     Operand::Byte (byte))       => (Operand::Byte(byte), false),
-            (AddressingMode::Relative,      Operand::Byte (byte))       => (Operand::Address(self.pc.wrapping_add(byte as u16)), false),
+            (AddressingMode::Relative,      Operand::Byte (byte))       => (Operand::Address(self.pc.wrapping_add(byte as i8 as u16)), false),
             (AddressingMode::Absolute,      Operand::Address (address)) => (Operand::Address(address), false),
             (AddressingMode::AbsoluteX,     Operand::Address (address)) => (
                 Operand::Address(address.wrapping_add(self.x as u16)),
@@ -470,7 +470,7 @@ impl Cpu {
     }
 
     /**
-     * Fetch, decode and execue=te next instruction
+     * Fetch, decode and execute next instruction
      */
     pub fn execute (&mut self, bus: &mut Bus) {
         let (instruction, operand, read) = bus.fetch_instruction(self.pc);
@@ -702,12 +702,12 @@ impl Cpu {
             Operand::Address (address) => address,
             _ => panic!("Invalid addressing mode"),
         };
-    
+
         if !self.get_flag(StatusFlag::Negative) {
             self.branch(address);
         }
     }
-    
+
     /**
      * Force Break
      */
@@ -1004,9 +1004,9 @@ impl Cpu {
             Operand::Address (address) => bus.read(address),
             _ => panic!("Invalid addressing mode"),
         };
-    
+
         self.a = value;
-    
+
         self.set_flag(StatusFlag::Zero, value == 0);
         self.set_flag(StatusFlag::Negative, (value as i8) < 0);
     }

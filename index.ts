@@ -74,13 +74,13 @@ export class Nes extends Emulator<AudioPCM, Video2D> {
 
         return {
             audio,
+            time,
             performance: {
                 fps: stats.fpsAverage || stats.fps,
                 delta: stats.deltaAverage || stats.delta,
                 frame: stats.frame,
                 timestamp: stats.timestamp,
             },
-            time,
         }
     }
 

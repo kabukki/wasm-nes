@@ -104,8 +104,11 @@ impl Nes {
         TimeDebug {
             time: self.clock.time,
             cpu_cycles: self.cpu.clock.cycles,
+            cpu_rate: self.cpu.clock.rate,
             ppu_cycles: self.bus.ppu.clock.cycles,
+            ppu_rate: self.bus.ppu.clock.rate,
             apu_cycles: self.bus.apu.clock.cycles,
+            apu_rate: self.bus.apu.clock.rate,
         }
     }
 }
@@ -140,8 +143,11 @@ impl NesDebug {
 pub struct TimeDebug {
     time: f64,
     cpu_cycles: usize,
+    cpu_rate: f64,
     ppu_cycles: usize,
+    ppu_rate: f64,
     apu_cycles: usize,
+    apu_rate: f64,
 }
 
 #[wasm_bindgen]
@@ -156,13 +162,28 @@ impl TimeDebug {
         self.cpu_cycles
     }
 
+    #[wasm_bindgen(getter = cpuRate)]
+    pub fn cpu_rate (&self) -> f64 {
+        self.cpu_rate
+    }
+
     #[wasm_bindgen(getter = ppuCycles)]
     pub fn ppu_cycles (&self) -> usize {
         self.ppu_cycles
     }
 
+    #[wasm_bindgen(getter = ppuRate)]
+    pub fn ppu_rate (&self) -> f64 {
+        self.ppu_rate
+    }
+
     #[wasm_bindgen(getter = apuCycles)]
     pub fn apu_cycles (&self) -> usize {
         self.apu_cycles
+    }
+
+    #[wasm_bindgen(getter = apuRate)]
+    pub fn apu_rate (&self) -> f64 {
+        self.apu_rate
     }
 }

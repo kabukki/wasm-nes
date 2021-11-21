@@ -7,10 +7,11 @@ use std::io::Cursor;
 use std::fmt;
 use crate::cartridge::{
     mapper::{Mapper, get_mapper},
-    debug::CartridgeDebug,
+    ines::InesHeader,
 };
 
 pub mod mapper;
+pub mod ines;
 pub mod debug;
 
 pub const PRG_BANK_SIZE: usize = 0x4000; // 16 KiB
@@ -72,7 +73,7 @@ pub struct Cartridge {
     pub chr: Vec<u8>,
     mirroring: Mirroring,
     mapper: Box<dyn Mapper>,
-    debug: CartridgeDebug,
+    ines: InesHeader,
 }
 
 impl Cartridge {
@@ -103,7 +104,7 @@ impl Cartridge {
             chr: vec![0; std::cmp::max(chr_banks, 1) * CHR_BANK_SIZE], // No distinction between CHR ROM and RAM
             mirroring,
             mapper: get_mapper(mapper),
-            debug: CartridgeDebug {
+            ines: InesHeader {
                 prg_banks,
                 chr_banks,
                 chr_type,

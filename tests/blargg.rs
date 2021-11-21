@@ -7,7 +7,8 @@ macro_rules! run {
                 println!("Passed !");
             },
             Err ((code, message)) => {
-                println!("Failed ({:02X}): {}", code, message);
+                println!("{}", message);
+                panic!("Failed ({:02X})", code);
             },
         }
     };
@@ -17,7 +18,13 @@ fn read_string (nes: &mut Nes) -> String {
     let mut bytes: Vec<u8> = vec![];
 
     for address in 0x6004.. {
-        bytes.push(nes.read(address));
+        let byte = nes.read(address);
+
+        if byte > 0 {
+            bytes.push(byte);
+        } else {
+            break;
+        }
     }
 
     String::from_utf8(bytes).unwrap()

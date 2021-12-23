@@ -13,6 +13,7 @@ use crate::{
 pub struct CartridgeDebug {
     ines: InesHeader,
     ram: Vec<u8>,
+    rom: Vec<u8>,
 }
 
 #[wasm_bindgen]
@@ -26,6 +27,11 @@ impl CartridgeDebug {
     pub fn ram (&self) -> Vec<u8> {
         self.ram.to_owned()
     }
+
+    #[wasm_bindgen(getter)]
+    pub fn rom (&self) -> Vec<u8> {
+        self.rom.to_owned()
+    }
 }
 
 impl Probe<CartridgeDebug> for Cartridge {
@@ -33,6 +39,7 @@ impl Probe<CartridgeDebug> for Cartridge {
         CartridgeDebug {
             ines: self.ines.to_owned(),
             ram: self.prg_ram.to_vec(),
+            rom: self.prg_rom.to_vec(),
         }
     }
 }

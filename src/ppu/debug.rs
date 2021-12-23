@@ -71,17 +71,6 @@ impl Ppu {
     }
 }
 
-impl Probe<PpuDebug> for Ppu {
-    fn get_debug (&self, cartridge: &Cartridge) -> PpuDebug {
-        PpuDebug {
-            oam: self.oam.to_vec(),
-            pattern_tables: self.get_pattern_tables(cartridge),
-            palettes: self.get_palettes(),
-            palette: self.get_palette(),
-        }
-    }
-}
-
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct PpuDebug {
@@ -111,6 +100,17 @@ impl PpuDebug {
     #[wasm_bindgen(getter)]
     pub fn palette (&self) -> Clamped<Vec<u8>> {
         Clamped(self.palette.to_owned())
+    }
+}
+
+impl Probe<PpuDebug> for Ppu {
+    fn get_debug (&self, cartridge: &Cartridge) -> PpuDebug {
+        PpuDebug {
+            oam: self.oam.to_vec(),
+            pattern_tables: self.get_pattern_tables(cartridge),
+            palettes: self.get_palettes(),
+            palette: self.get_palette(),
+        }
     }
 }
 

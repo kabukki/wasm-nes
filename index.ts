@@ -20,6 +20,7 @@ export interface Options {
 }
 
 export class Nes extends Emulator<AudioPCM, Video2D> {
+    public static memory: WebAssembly.Memory;
     public readonly rom: Rom;
     private vm: any;
     private inputs: Uint8Array;
@@ -29,6 +30,17 @@ export class Nes extends Emulator<AudioPCM, Video2D> {
         this.rom = rom;
         this.inputs = new Uint8Array([0, 0]);
         this.vm = VM.new(rom.buffer, this.audio.sampleRate);
+    }
+
+    static async init () {
+        if (!Nes.memory) {
+            const wasm = await init();
+
+            set_panic_hook();
+            set_log();
+
+            Nes.memory = wasm.memory;
+        }
     }
 
     async init () {
@@ -51,7 +63,7 @@ export class Nes extends Emulator<AudioPCM, Video2D> {
         this.vm.get_framebuffer((this.video.framebuffer as unknown) as Uint8Array);
         this.video.paint();
         this.audio.queue(this.vm.get_audio());
-        this.emit('frame', this.debugFrame());
+        this.emit('debug', this.debugFrame());
     }
 
     reset () {
@@ -84,21 +96,14 @@ export class Nes extends Emulator<AudioPCM, Video2D> {
         }
     }
 
+    // IDEA: get debug info on every frame, like every other info; needs performance improvements first.
     debug () {
         const debug = this.vm.get_debug();
-
+        
         return {
             cartridge: debug.cartridge,
             ppu: debug.ppu,
+            ram: debug.ram,
         };
     }
-}
-
-export default async function () {
-    const wasm = await init();
-    
-    set_panic_hook();
-    set_log();
-
-    return wasm;
 }

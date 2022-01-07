@@ -19,7 +19,7 @@ export interface Options {
     rom: Rom;
 }
 
-export class Nes extends Emulator<AudioPCM, Video2D> {
+export class Nes extends Emulator <AudioPCM, Video2D> {
     public static memory: WebAssembly.Memory;
     public readonly rom: Rom;
     private vm: any;
@@ -45,10 +45,6 @@ export class Nes extends Emulator<AudioPCM, Video2D> {
 
     async init () {
         await this.audio.init();
-    }
-
-    loadSave (save: Save) {
-        this.vm.set_cartridge_ram(save.data);
     }
 
     input (index: number, input: number) {
@@ -77,6 +73,10 @@ export class Nes extends Emulator<AudioPCM, Video2D> {
             data: this.vm.get_cartridge_ram(),
             thumbnail: this.video.screenshot(),
         } as Save;
+    }
+
+    load (save: Save) {
+        this.vm.set_cartridge_ram(save.data);
     }
 
     debugFrame () {

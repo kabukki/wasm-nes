@@ -4,6 +4,8 @@
         "declaration": true,
         "declarationDir": "dist",
         "moduleResolution": "node",
-        "module": "esnext"
+        "module": "esnext",
+        "jsx": "react",
+        "allowSyntheticDefaultImports": true
     }
 }

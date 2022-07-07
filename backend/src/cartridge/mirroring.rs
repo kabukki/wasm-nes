@@ -1,9 +1,6 @@
-use wasm_bindgen::prelude::wasm_bindgen;
 use std::fmt;
-use serde::Serialize;
 
-#[wasm_bindgen]
-#[derive(Debug, PartialEq, Copy, Clone, Serialize)]
+#[derive(Debug, PartialEq, Copy, Clone, serde::Serialize)]
 pub enum Mirroring {
     OneScreenLower,
     OneScreenUpper,

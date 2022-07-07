@@ -1,4 +1,4 @@
-use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::prelude::*;
 use crate::{
     cpu::{Interrupt, INTERRUPT_LATENCY},
     bus::Bus,

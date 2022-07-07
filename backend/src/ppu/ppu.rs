@@ -11,7 +11,7 @@
  * http://wiki.nesdev.com/w/index.php/PPU_nametables
  */
 
-use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::prelude::*;
 use crate::{
     cpu::{Cpu, Interrupt},
     cartridge::{Cartridge, Mirroring},

@@ -1,9 +1,8 @@
 use wasm_bindgen::prelude::*;
-use serde::Serialize;
 
 static mut LOGGER: Option<Logger> = None;
 
-#[derive(Serialize)]
+#[derive(serde::Serialize)]
 struct Log {
     text: String,
     level: String,

@@ -4,21 +4,56 @@ A **NES** emulator written in Rust compiled to WebAssemly for usage on the web.
 
 > The Nintendo Entertainment System (NES) is an 8-bit third-generation home video game console produced by Nintendo. Nintendo first released it in Japan as the Family Computer, commonly known as the Famicom, in 1983. The NES, a remodelled version, was released internationally in the following years.
 
-## Features
+## Overview
 
-- ✅ Central Processing Unit (Ricoh 2A03) 
-- ✅ Pixel Processing Unit
-- 🚧 Audio Processing Unit: Pulse, ~~triangle~~, ~~noise~~, ~~DMC~~.
-- ✅ Controller input
-- ✅ Cartridge [mappers](https://wiki.nesdev.com/w/index.php/Mapper): `NROM`, `MMC1`, `UxROM`, `CNROM`, `GxROM`.
-- ✅ Games saves via cartridge RAM
+- ✅ **CPU**: all official opcodes # Central Processing Unit (Ricoh 2A03) 
+- ✅ **PPU**: Pixel Processing Unit
+- 🚧 **APU**: Audio Processing Unit: Pulse, ~~triangle~~, ~~noise~~, ~~DMC~~.
+- ✅ **Input**: Controller input
+- ✅ **[Mappers](https://wiki.nesdev.com/w/index.php/Mapper)**: `NROM`, `MMC1`, `UxROM`, `003`, `CNROM`, `AxROM`, `GxROM`.
+- ✅ **Save states**: game saves via cartridge RAM
 
-### Weak points
+### Timing
+
+The emulator synchronizes to video with the [requestAnimationFrame](https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame) function, which usually matches the refresh rate of the display.
+- CPU runs at 500Hz
+- Timers run at 60Hz
+
+At every repaint, enough emulator cycles are run to simulate that the duration for one frame has passed. Given an ideal refresh rate of 60FPS, that is 1/60s.
+
+### Known limitations
 
 The emulator currently lacks in the following areas:
 - Open bus behaviour is missing
 - Precise PPU timing
 - Some sprites are not displayed correctly
+
+## Usage
+
+Before creating the emulator, you need to call the `init` function which will correctly instantiate and setup the WebAssembly module.
+
+```js
+import init, { Emulator } from '@kabukki/wasm-nes';
+
+init().then(() => {
+    const emulator = new Emulator();
+
+    document.getElementById('input').addEventListener('change', async (e) => {
+        const buffer = await e.target.files[0]?.arrayBuffer();
+        emulator.load(new Uint8Array(buffer));
+        emulator.start();
+    });
+}).catch(console.error);
+```
+
+### `useDebug`
+
+This hook provides various information regarding emulation status.
+
+- `logs` emulator logs (nestest compliant) produced through Rust's [log](https://crates.io/crates/log) facade.
+- `emulator` emulator state
+- `performance` measures of browser frame performance
+
 
 ## Tests
 
@@ -165,24 +200,6 @@ You'll need a 6502 assembler & linker such as [cc65](https://github.com/cc65/cc6
 cl65 roms/test.s -C roms/test.cfg -o roms/test.bin
 ```
 
-## Usage
-
-Before creating the emulator, you need to call the `init` function which will correctly instantiate and setup the WebAssembly module.
-
-```js
-import init, { Emulator } from '@kabukki/wasm-nes';
-
-init().then(() => {
-    const emulator = new Emulator();
-
-    document.getElementById('input').addEventListener('change', async (e) => {
-        const buffer = await e.target.files[0]?.arrayBuffer();
-        emulator.load(new Uint8Array(buffer));
-        emulator.start();
-    });
-}).catch(console.error);
-```
-
 ## Resources
 
 ### Reference
@@ -236,3 +253,4 @@ init().then(() => {
 
 - https://jackschaedler.github.io/circles-sines-signals/dft_introduction.html
 - https://www.ams.jhu.edu/dan-mathofmusic/sound-waves/
+- https://pudding.cool/2018/02/waveforms/

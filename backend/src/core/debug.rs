@@ -48,23 +48,21 @@ impl Emulator {
                     let sprite_height = if (self.bus.ppu.ctrl & crate::ppu::CtrlFlag::SpriteHeight as u8) > 0 { 16 } else { 8 };
         
                     let sprite_address = if sprite_height == 16 {
-                        let bank = sprite_id & 1;
-                        bank * 0x1000 + (sprite_id >> 1) * 16
+                        let bank = if (sprite_id & 1) > 0 { 0x1000 } else { 0 };
+                        bank + (sprite_id >> 1) * 32
                     } else {
-                        let bank = (self.bus.ppu.ctrl & crate::ppu::CtrlFlag::Sprite as u8) as u16;
-                        bank * 0x1000 + sprite_id * 16
+                        let bank = if (self.bus.ppu.ctrl & crate::ppu::CtrlFlag::Sprite as u8) > 0 { 0x1000 } else { 0 };
+                        bank + sprite_id * 16
                     };
         
                     let mut img = image::RgbaImage::new(8, sprite_height);
                     
                     for y in 0..sprite_height {
-                        // fix ?
                         let (hi, lo) = (
-                            self.bus.cartridge.read_chr(sprite_address + y as u16 + 8),
-                            self.bus.cartridge.read_chr(sprite_address + y as u16),
+                            self.bus.ppu.read_vram(&self.bus.cartridge, sprite_address + y as u16 + sprite_height as u16),
+                            self.bus.ppu.read_vram(&self.bus.cartridge, sprite_address + y as u16),
                         );
-                        log::trace!("Sprite {:X}, hi {:04X}, lo {:04X}", sprite_id, sprite_address + y as u16, sprite_address + y as u16 + 8);
-                
+
                         for x in 0..8 {
                             let (hi, lo) = (hi >> (7 - x) & 1, lo >> (7 - x) & 1);
                             let (r, g, b) = crate::ppu::PALETTE[self.bus.ppu.read_vram(&self.bus.cartridge, 0x3F10 + (palette_num << 2) as u16 + (hi << 1 | lo) as u16) as usize];
@@ -104,6 +102,6 @@ impl Emulator {
                 ram: self.bus.cartridge.prg_ram.clone(),
                 pattern_tables: self.bus.cartridge.get_pattern_tables(),
             },
-        }).expect("Caca")
+        }).expect("Could not get debug info")
     }
 }

@@ -99,14 +99,11 @@ impl Emulator {
             },
             cartridge: crate::debug::Cartridge {
                 ines: self.bus.cartridge.ines,
-                ram: self.bus.cartridge.prg_ram.clone(),
                 pattern_tables: (0..512).map(|n| {
-                    // let sprite_height = if (self.bus.ppu.ctrl & crate::ppu::CtrlFlag::SpriteHeight as u8) > 0 { 16 } else { 8 };
                     let mut img = image::RgbaImage::new(8, 8);
         
                     let row = n / 16;
                     let col = n % 16;
-
                     let address = (0 << 12) | (row << 8) | (col << 4);
 
                     for y in 0..8 {

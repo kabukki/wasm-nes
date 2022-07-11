@@ -43,30 +43,29 @@ impl Emulator {
                         self.bus.ppu.oam[n * 4 + 2],
                         self.bus.ppu.oam[n * 4 + 3],
                     );
-        
                     let palette_num = sprite_attributes & crate::ppu::SpriteAttribute::Palette as u8;
                     let sprite_height = if (self.bus.ppu.ctrl & crate::ppu::CtrlFlag::SpriteHeight as u8) > 0 { 16 } else { 8 };
-        
-                    let sprite_address = if sprite_height == 16 {
-                        let bank = if (sprite_id & 1) > 0 { 0x1000 } else { 0 };
-                        bank + (sprite_id >> 1) * 32
-                    } else {
-                        let bank = if (self.bus.ppu.ctrl & crate::ppu::CtrlFlag::Sprite as u8) > 0 { 0x1000 } else { 0 };
-                        bank + sprite_id * 16
-                    };
-        
+
                     let mut img = image::RgbaImage::new(8, sprite_height);
-                    
+
                     for y in 0..sprite_height {
+                        let row = y as u16 % 8; // Take into account 16px high tiles
+                        let address = if sprite_height == 16 {
+                            let half = y as u16 / 8; // Either top (0) or bottom (1) half
+                            (sprite_id & 1) * 0x1000 + ((sprite_id & 0b1111_1110) + half) * 16
+                        } else {
+                            16 * sprite_id + if (self.bus.ppu.ctrl & crate::ppu::CtrlFlag::Sprite as u8) > 0 { 0x1000 } else { 0 }
+                        };
+
                         let (hi, lo) = (
-                            self.bus.ppu.read_vram(&self.bus.cartridge, sprite_address + y as u16 + sprite_height as u16),
-                            self.bus.ppu.read_vram(&self.bus.cartridge, sprite_address + y as u16),
+                            self.bus.ppu.read_vram(&self.bus.cartridge, address + row as u16 + 8 as u16),
+                            self.bus.ppu.read_vram(&self.bus.cartridge, address + row as u16),
                         );
 
                         for x in 0..8 {
                             let (hi, lo) = (hi >> (7 - x) & 1, lo >> (7 - x) & 1);
                             let (r, g, b) = crate::ppu::PALETTE[self.bus.ppu.read_vram(&self.bus.cartridge, 0x3F10 + (palette_num << 2) as u16 + (hi << 1 | lo) as u16) as usize];
-                            img.put_pixel(x, y as u32, image::Rgba([r, g, b, 255]));
+                            img.put_pixel(x, y, image::Rgba([r, g, b, 255]));
                         }
                     }
 
@@ -86,9 +85,11 @@ impl Emulator {
                         tile: img.into_vec(),
                     }
                 }).collect(),
-                palettes: self.bus.ppu.palettes.iter().map(|&n| {
-                    let (r, g, b) = crate::ppu::PALETTE[n as usize];
-                    ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
+                palettes: (0..8).map(|n| {
+                    (0..4).map(|color| {
+                        let (r, g, b) = crate::ppu::PALETTE[self.bus.ppu.read_vram(&self.bus.cartridge, 0x3F00 + n * 4 + color) as usize];
+                        ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
+                    }).collect()
                 }).collect(),
                 palette: crate::ppu::PALETTE.iter().map(|&(r, g, b)| {
                     ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)
@@ -98,9 +99,31 @@ impl Emulator {
             },
             cartridge: crate::debug::Cartridge {
                 ines: self.bus.cartridge.ines,
-                rom: self.bus.cartridge.prg_rom.clone(),
                 ram: self.bus.cartridge.prg_ram.clone(),
-                pattern_tables: self.bus.cartridge.get_pattern_tables(),
+                pattern_tables: (0..512).map(|n| {
+                    // let sprite_height = if (self.bus.ppu.ctrl & crate::ppu::CtrlFlag::SpriteHeight as u8) > 0 { 16 } else { 8 };
+                    let mut img = image::RgbaImage::new(8, 8);
+        
+                    let row = n / 16;
+                    let col = n % 16;
+
+                    let address = (0 << 12) | (row << 8) | (col << 4);
+
+                    for y in 0..8 {
+                        let (hi, lo) = (
+                            self.bus.ppu.read_vram(&self.bus.cartridge, address as u16 + y as u16 + 8 as u16),
+                            self.bus.ppu.read_vram(&self.bus.cartridge, address as u16 + y as u16),
+                        );
+
+                        for x in 0..8 {
+                            let (hi, lo) = (hi >> (7 - x) & 1, lo >> (7 - x) & 1);
+                            let (r, g, b) = crate::ppu::PALETTE[self.bus.ppu.read_vram(&self.bus.cartridge, 0x3F00 + (0 << 4) as u16 + (hi << 1 | lo) as u16) as usize];
+                            img.put_pixel(x, y, image::Rgba([r, g, b, 255]));
+                        }
+                    }
+
+                    img.into_vec()
+                }).collect()
             },
         }).expect("Could not get debug info")
     }

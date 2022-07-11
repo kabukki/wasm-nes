@@ -390,7 +390,7 @@ impl Ppu {
                     self.oam_secondary[index * 4 + 2],
                     self.oam_secondary[index * 4 + 3],
                 );
-                
+
                 if sprite_y != 0xFF {
                     let row = (self.scanline - sprite_y) % 8; // Take into account 16px high tiles
                     let address = if (self.ctrl & CtrlFlag::SpriteHeight as u8) > 0 {

@@ -28,11 +28,11 @@ export class Nes {
 
         // await this.audio.init();
         set_panic_hook((message) => this.stop(new Error(message)));
-        // set_logger((log) => {
-        //     // console.log(log);
+        set_logger((log) => {
+            console.log(log.text);
             
-        //     // this.logs.push(log);
-        // });
+            // this.logs.push(log);
+        });
         // db.getAll().then(setSaves).catch(setError);
     }
 
@@ -124,7 +124,7 @@ export class Nes {
         if (!this.dbg) {
             this.dbg = this.vm.get_debug();
         }
-        
+
         return this.dbg;
     }
 }

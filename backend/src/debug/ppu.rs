@@ -7,7 +7,7 @@ pub struct Ppu {
     pub scanline: u16,
     pub frame: usize,
     pub oam: Vec<Oam>,
-    pub palettes: Vec<u32>,
+    pub palettes: Vec<Vec<u32>>,
     pub palette: Vec<u32>,
     pub nametables: Vec<u8>,
     pub clock: crate::clock::ClockDivider,
@@ -20,5 +20,4 @@ pub struct Oam {
     pub y: u16,
     pub attr: u8,
     pub tile: Vec<u8>,
-    // pub (crate) tile: image::RgbImage,
 }

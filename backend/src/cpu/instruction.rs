@@ -479,6 +479,10 @@ impl Cpu {
         self.pc += read;
 
         let operand = self.decode(bus, instruction, operand);
+
+        // log::trace!("PC:{:04X} A:{:02X} X:{:02X} Y:{:02X} P:{:08b} SP:{:02X} PPU:---,--- CYC:{}", self.pc, self.a, self.x, self.y, self.status, self.sp, self.clock.cycles);
+        // log::trace!("{:02X}", instruction.opcode);
+
         match instruction.operator {
             Operator::ADC => { self.adc(operand, bus); },
             Operator::AND => { self.and(operand, bus); },
@@ -538,8 +542,6 @@ impl Cpu {
             Operator::TYA => { self.tya(operand, bus); },
             _ => unimplemented!(),
         };
-
-        // log::trace!("{:02X}", instruction.opcode);
 
         self.cycles += instruction.cycles;
     }

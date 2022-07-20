@@ -2,8 +2,7 @@
  * https://wiki.nesdev.org/w/index.php/MMC1
  */
 
-use log::warn;
-use crate::cartridge::Mirroring;
+use crate::cartridge::{Mirroring, Bank};
 
 pub struct Mapper001 {
     prg_bank: u8,
@@ -12,12 +11,14 @@ pub struct Mapper001 {
     load: u8,
     ctrl: u8,
 }
+
 impl Mapper001 {
     const PRG_WINDOW: usize         = 0x4000; // 16 KiB
     const PRG_WINDOW_LARGE: usize   = 0x8000; // 32 KiB
     const CHR_WINDOW: usize         = 0x1000; // 4 KiB
     const CHR_WINDOW_LARGE: usize   = 0x2000; // 8 KiB
 }
+
 impl super::Mapper for Mapper001 {
     fn read_chr (&self, address: u16, chr: &Vec<u8>) -> u8 {
         match (self.ctrl & 0b0001_0000) >> 4 {
@@ -107,7 +108,7 @@ impl super::Mapper for Mapper001 {
                     }
                 }
             },
-            _ => warn!("Invalid PRG write {:#x}", address),
+            _ => log::warn!("Invalid PRG write {:#x}", address),
         }
     }
 
@@ -120,7 +121,55 @@ impl super::Mapper for Mapper001 {
             _ => unreachable!(),
         }
     }
+
+    fn get_current_prg (&self, prg_rom: &Vec<u8>) -> Vec<Bank> {
+        match (self.ctrl & 0b0000_1100) >> 2 {
+            0b00 | 0b01 => vec![
+                Bank { number: self.prg_bank & 0b0001_1110, size: Mapper001::PRG_WINDOW_LARGE },
+            ],
+            0b10 => vec![
+                Bank { number: 0, size: Mapper001::PRG_WINDOW },
+                Bank { number: self.prg_bank, size: Mapper001::PRG_WINDOW },
+            ],
+            0b11 => vec![
+                Bank { number: self.prg_bank, size: Mapper001::PRG_WINDOW },
+                Bank { number: (prg_rom.len() / Mapper001::PRG_WINDOW) as u8 - 1, size: Mapper001::PRG_WINDOW },
+            ],
+            _ => unreachable!(),
+        }
+    }
+
+    fn get_current_chr (&self, _chr: &Vec<u8>) -> Vec<Bank> {
+        match (self.ctrl & 0b0001_0000) >> 4 {
+            0 => vec![
+                Bank { number: self.chr_bank_0 & 0b0001_1110, size: Mapper001::CHR_WINDOW_LARGE },
+            ],
+            1 => vec![
+                Bank { number: self.chr_bank_0, size: Mapper001::CHR_WINDOW },
+                Bank { number: self.chr_bank_1, size: Mapper001::CHR_WINDOW },
+            ],
+            _ => unreachable!(),
+        }
+    }
+
+    fn get_bank_at (&self, prg_rom: &Vec<u8>, address: u16) -> u8 {
+        match (self.ctrl & 0b0000_1100) >> 2 {
+            0b00 | 0b01 => self.prg_bank & 0b0001_1110,
+            0b10 => match address {
+                0x8000 ..= 0xBFFF => 0,
+                0xC000 ..= 0xFFFF => self.prg_bank,
+                _ => unreachable!(),
+            },
+            0b11 => match address {
+                0x8000 ..= 0xBFFF => self.prg_bank,
+                0xC000 ..= 0xFFFF => (prg_rom.len() / Mapper001::PRG_WINDOW) as u8 - 1,
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        }
+    }
 }
+
 impl Default for Mapper001 {
     fn default () -> Self {
         Mapper001 {

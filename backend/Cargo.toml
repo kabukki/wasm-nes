@@ -11,11 +11,10 @@ wasm-opt = ["-O", "-g"]
 [dependencies]
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 serde = { version = "1.0", features = ["derive"] }
-log = { version = "0.4.16", features = ["std"] }
+log = { version = "0.4.16", features = ["std", "serde"] }
 js-sys = "0.3.51"
 wee_alloc = "0.4.5"
 image = "0.24.2"
-base64 = "0.13.0"
 
 [dev-dependencies]
 colored = "2"

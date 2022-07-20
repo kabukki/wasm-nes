@@ -2,15 +2,16 @@
  * https://wiki.nesdev.org/w/index.php/INES_Mapper_003
  */
 
-use log::warn;
-use crate::cartridge::Mirroring;
+use crate::cartridge::{Mirroring, Bank};
 
 pub struct Mapper003 {
     chr_bank: u8,
 }
+
 impl Mapper003 {
     const CHR_WINDOW: usize = 0x2000; // 8 KiB
 }
+
 impl super::Mapper for Mapper003 {
     fn read_chr (&self, address: u16, chr: &Vec<u8>) -> u8 {
         chr[(self.chr_bank as usize * Mapper003::CHR_WINDOW) + (address as usize % Mapper003::CHR_WINDOW)]
@@ -37,14 +38,30 @@ impl super::Mapper for Mapper003 {
             0x8000 ..= 0xFFFF => {
                 self.chr_bank = data & 0b0000_0011; // Max. 4 * 8 KiB = 32 KiB CHR
             },
-            _ => warn!("Invalid PRG write {:#x}", address),
+            _ => log::warn!("Invalid PRG write {:#x}", address),
         }
     }
 
     fn get_mirroring (&self) -> Option<Mirroring> {
         None
     }
+
+    fn get_current_prg (&self, prg_rom: &Vec<u8>) -> Vec<Bank> {
+        vec![Bank { number: 0, size: prg_rom.len() }]
+    }
+
+    fn get_current_chr (&self, _chr: &Vec<u8>) -> Vec<Bank> {
+        vec![Bank { number: self.chr_bank, size: Mapper003::CHR_WINDOW }]
+    }
+
+    fn get_bank_at (&self, _prg_rom: &Vec<u8>, address: u16) -> u8 {
+        match address {
+            0x8000 ..= 0xFFFF => 0,
+            _ => unreachable!(),
+        }
+    }
 }
+
 impl Default for Mapper003 {
     fn default () -> Self {
         Mapper003 {

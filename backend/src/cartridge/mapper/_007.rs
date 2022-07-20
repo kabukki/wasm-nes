@@ -2,16 +2,17 @@
  * https://wiki.nesdev.org/w/index.php/AxROM
  */
 
-use log::warn;
-use crate::cartridge::Mirroring;
+use crate::cartridge::{Mirroring, Bank};
 
 pub struct Mapper007 {
     prg_bank: u8,
     mirroring: Option<Mirroring>,
 }
+
 impl Mapper007 {
     const PRG_WINDOW: usize = 0x8000; // 32 KiB
 }
+
 impl super::Mapper for Mapper007 {
     fn read_chr (&self, address: u16, chr: &Vec<u8>) -> u8 {
         chr[address as usize]
@@ -39,14 +40,30 @@ impl super::Mapper for Mapper007 {
                 self.prg_bank = data & 0b0000_0111; // Max. 8 * 32 KiB = 256 KiB PRG
                 self.mirroring = if (data & 0b0001_0000) > 0 { Some(Mirroring::OneScreenLower) } else { None }
             },
-            _ => warn!("Invalid PRG write {:#x}", address),
+            _ => log::warn!("Invalid PRG write {:#x}", address),
         }
     }
 
     fn get_mirroring (&self) -> Option<Mirroring> {
         self.mirroring
     }
+
+    fn get_current_prg (&self, _prg_rom: &Vec<u8>) -> Vec<Bank> {
+        vec![Bank { number: self.prg_bank, size: Mapper007::PRG_WINDOW }]
+    }
+
+    fn get_current_chr (&self, chr: &Vec<u8>) -> Vec<Bank> {
+        vec![Bank { number: 0, size: chr.len() }]
+    }
+
+    fn get_bank_at (&self, _prg_rom: &Vec<u8>, address: u16) -> u8 {
+        match address {
+            0x8000 ..= 0xFFFF => self.prg_bank,
+            _ => unreachable!(),
+        }
+    }
 }
+
 impl Default for Mapper007 {
     fn default () -> Self {
         Mapper007 {

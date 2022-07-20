@@ -7,9 +7,9 @@ use crate::{
 
 #[wasm_bindgen]
 pub struct Emulator {
-    pub(super) cpu: Cpu,
-    pub(super) bus: Bus,
-    pub(super) clock: Clock,
+    pub (crate) cpu: Cpu,
+    pub (crate) bus: Bus,
+    pub (crate) clock: Clock,
 }
 
 #[wasm_bindgen]
@@ -48,7 +48,7 @@ impl Emulator {
         }
     }
 
-    pub fn cycle_until_ppu (&mut self) {
+    pub fn cycle_until_scanline (&mut self) {
         let cycle = self.bus.ppu.scanline;
 
         while cycle == self.bus.ppu.scanline {
@@ -56,9 +56,21 @@ impl Emulator {
         }
     }
 
-    // fn cycle_for (&mut self, duration: f64) {
+    pub fn cycle_until_ppu (&mut self) {
+        let cycle = self.bus.ppu.clock.cycles;
 
-    // }
+        while cycle == self.bus.ppu.clock.cycles {
+            self.cycle();
+        }
+    }
+
+    pub fn cycle_until_cpu (&mut self) {
+        let cycle = self.cpu.clock.cycles;
+
+        while cycle == self.cpu.clock.cycles {
+            self.cycle();
+        }
+    }
 
     // pub fn set_rate (&mut self) {
     //     self.clock.rate = crate::util::CLOCK_MASTER_PAL;

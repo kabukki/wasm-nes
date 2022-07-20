@@ -21,13 +21,7 @@ impl log::Log for Logger {
     fn log (&self, record: &log::Record) {
         self.callback.call1(&JsValue::null(), &JsValue::from_serde(&Log {
             text: format!("{}", record.args()),
-            level: match record.level() {
-                log::Level::Error   =>  format!("error"),
-                log::Level::Warn    =>  format!("warning"),
-                log::Level::Info    =>  format!("info"),
-                log::Level::Debug   =>  format!("debug"),
-                log::Level::Trace   =>  format!("trace"),
-            },
+            level: format!("{}", record.level()),
             location: match (record.file(), record.line()) {
                 (Some(file), Some(line))    =>  format!("{}:{}", file, line),
                 _                           =>  format!("unknown"),
@@ -45,8 +39,18 @@ unsafe impl Send for Logger {}
 pub fn set_logger (callback: js_sys::Function) {
     unsafe {
         LOGGER = Some(Logger { callback });
-        
+
         log::set_logger(LOGGER.as_ref().unwrap()).unwrap();
-        log::set_max_level(log::LevelFilter::Trace);
+        log::set_max_level(log::LevelFilter::Off);
     }
+}
+
+#[wasm_bindgen]
+pub fn set_log_level (level: &JsValue) {
+    log::set_max_level(level.into_serde().unwrap());
+}
+
+#[wasm_bindgen]
+pub fn get_log_level () -> JsValue {
+    JsValue::from_serde(&log::max_level()).unwrap()
 }

@@ -89,8 +89,8 @@ impl Cpu {
      */
     pub fn cycle (&mut self, bus: &mut Bus) {
         if self.cycles == 0 {
-            if self.interrupt.is_some() {
-                self.interrupt(self.interrupt.unwrap(), bus);
+            if let Some(interrupt) = self.interrupt {
+                self.interrupt(interrupt, bus);
                 self.interrupt = None;
             } else {
                 self.execute(bus);
@@ -123,7 +123,7 @@ impl Cpu {
     }
 
     pub fn interrupt (&mut self, interrupt: Interrupt, bus: &mut Bus) {
-        // println!("INTERRUPT {:?}", interrupt);
+        // log::debug!("Interrupt {:?}", interrupt);
         match interrupt {
             Interrupt::NMI | Interrupt::IRQ => {
                 if self.get_flag(StatusFlag::DisableInterrupt) && interrupt == Interrupt::IRQ {

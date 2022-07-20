@@ -1,7 +1,3 @@
-/**
- * iNES format http://wiki.nesdev.com/w/index.php/INES
- */
-
 use std::{io::{Cursor, prelude::*}, fmt};
 use crate::cartridge::*;
 

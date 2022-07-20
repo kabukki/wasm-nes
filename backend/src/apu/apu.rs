@@ -187,7 +187,10 @@ impl Apu {
                 self.status &= !(StatusFlag::FrameInterrupt as u8);
                 status
             },
-            _ => panic!("Invalid APU read @ {:#x}", address),
+            _ => {
+                log::warn!("Invalid APU read @ {:#x}", address);
+                0
+            },
         }
     }
 

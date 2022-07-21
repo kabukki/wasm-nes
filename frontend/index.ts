@@ -4,6 +4,7 @@ import wasm from '../backend/pkg/index_bg.wasm';
 import init, { Emulator, set_panic_hook } from '../backend/pkg';
 import { Debug } from './debug';
 import { Logs } from './logs';
+import { Audio } from './audio';
 
 export enum Status {
     IDLE,
@@ -20,6 +21,7 @@ export class Nes {
     logs: Logs;
     memory: WebAssembly.Memory;
     debug: Debug;
+    audio: Audio;
     onCycle?: () => void;
     onStatus?: () => void;
 
@@ -33,12 +35,12 @@ export class Nes {
     }
 
     private constructor (rom, memory) {
-        this.#vm = Emulator.new(rom, 0);
-        this.#stats = new GameStats({ historyLimit: 100 });
         this.logs = new Logs();
         this.memory = memory;
+        this.audio = new Audio();
+        this.#vm = Emulator.new(rom, this.audio.sampleRate);
+        this.#stats = new GameStats({ historyLimit: 100 });
 
-        // await this.audio.init();
         set_panic_hook((message) => this.stop(new Error(message)));
         // db.getAll().then(setSaves).catch(setError);
     }
@@ -54,12 +56,12 @@ export class Nes {
         };
 
         this.#rafHandle = requestAnimationFrame(rafCallback);
-        // this.audio.start();
+        this.audio.start();
         this.onStatus?.();
     }
 
     stop (error?: Error) {
-        // audio.stop();
+        this.audio.stop();
         cancelAnimationFrame(this.#rafHandle);
         this.#rafHandle = null;
 
@@ -81,7 +83,8 @@ export class Nes {
             fn();
             this.debug = new Debug(this.#vm);
             this.render();
-            // this.audio.queue(this.vm.get_audio());
+            this.audio.analyze();
+            this.audio.queue(this.#vm.get_audio());
         } catch (err) {
             // Don't call stop() here, because the original error will already be caught by the panic hook
             console.error(err);

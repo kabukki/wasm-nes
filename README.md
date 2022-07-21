@@ -10,7 +10,7 @@ A **NES** emulator written in Rust compiled to WebAssemly for usage on the web.
 - ✅ **PPU**: Pixel Processing Unit
 - 🚧 **APU**: Audio Processing Unit: Pulse, ~~triangle~~, ~~noise~~, ~~DMC~~.
 - ✅ **Input**: Controller input
-- ✅ **[Mappers](https://wiki.nesdev.com/w/index.php/Mapper)**: `NROM`, `MMC1`, `UxROM`, `003`, `CNROM`, `AxROM`, `GxROM`.
+- ✅ **Mappers**: `NROM`, `MMC1`, `UxROM`, `003`, `CNROM`, `AxROM`, `GxROM`.
 - ✅ **Save states**: game saves via cartridge RAM
 
 ### Timing
@@ -54,8 +54,12 @@ This hook provides various information regarding emulation status.
 - `emulator` emulator state
 - `performance` measures of browser frame performance
 
-
 ## Tests
+
+<img src="https://badgen.net/badge/cpu/70%25/green" />
+<img src="https://badgen.net/badge/ppu/24%25/yellow" />
+<img src="https://badgen.net/badge/apu/17%25/orange" />
+<img src="https://badgen.net/badge/mappers/-/grey" />
 
 Emulation accuracy is tested thanks to test ROMs taken from https://wiki.nesdev.com/w/index.php/Emulator_tests (available [here](https://github.com/christopherpow/nes-test-roms)), and inspired from http://tasvideos.org/EmulatorResources/NESAccuracyTests.html.
 Here is the summary of results, you can find details below.
@@ -254,3 +258,4 @@ cl65 roms/test.s -C roms/test.cfg -o roms/test.bin
 - https://jackschaedler.github.io/circles-sines-signals/dft_introduction.html
 - https://www.ams.jhu.edu/dan-mathofmusic/sound-waves/
 - https://pudding.cool/2018/02/waveforms/
+- https://web.dev/audio-scheduling/

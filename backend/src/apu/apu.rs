@@ -23,7 +23,6 @@ enum FrameCounterMode {
 /**
  * https://wiki.nesdev.org/w/index.php/APU
  */
-#[derive(Clone)]
 pub struct Apu {
     status: u8,
     mode: FrameCounterMode,

@@ -6,11 +6,11 @@
     "dist/*"
   ],
   "scripts": {
-    "build:back": "cd backend && wasm-pack build --profiling --target web --out-name index",
-    "build:front": "esbuild frontend/index.tsx --bundle --outdir=dist --sourcemap --format=esm --loader:.wasm=dataurl --external:react",
+    "build:back": "cd backend && wasm-pack build --release --target web --out-name index",
+    "build:front": "esbuild frontend/index.ts --bundle --outdir=dist --sourcemap --format=esm --loader:.wasm=dataurl --external:react",
     "build": "npm run build:back && npm run build:front",
     "watch:back": "cd backend && cargo watch -i pkg -s 'wasm-pack build --profiling --target web --out-name index'",
-    "watch:front": "esbuild frontend/index.tsx --bundle --outdir=dist --sourcemap --format=esm --loader:.wasm=dataurl --external:react --watch",
+    "watch:front": "esbuild frontend/index.ts --bundle --outdir=dist --sourcemap --format=esm --loader:.wasm=dataurl --external:react --watch",
     "watch": "concurrently -c red.bold,yellow.bold -n back,front npm:watch:back npm:watch:front",
     "test:back": "cd backend && cargo test -- --show-output",
     "lint:back": "cd backend && cargo clippy",
@@ -20,7 +20,6 @@
     "game-stats": "^0.1.1"
   },
   "devDependencies": {
-    "@types/react": "^18.0.10",
     "concurrently": "^7.2.1",
     "esbuild": "^0.12.15",
     "typescript": "^4.3.5"

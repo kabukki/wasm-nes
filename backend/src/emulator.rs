@@ -15,7 +15,7 @@ pub struct Emulator {
 #[wasm_bindgen]
 impl Emulator {
     pub fn new (rom: Vec<u8>, sample_rate: f64) -> Self {
-        let mut emulator = Emulator {
+        let mut emulator = Self {
             cpu: Cpu::new(),
             bus: Bus::new(&rom, sample_rate),
             clock: Clock::new(crate::clock::CLOCK_MASTER_NTSC),

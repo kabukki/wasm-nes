@@ -1,7 +1,7 @@
-import wasm from '../backend/pkg/index_bg.wasm';
-import init, { Emulator, set_panic_hook } from '../backend/pkg';
 import GameStats from 'game-stats';
 
+import wasm from '../backend/pkg/index_bg.wasm';
+import init, { Emulator, set_panic_hook } from '../backend/pkg';
 import { Debug } from './debug';
 import { Logs } from './logs';
 
@@ -102,7 +102,7 @@ export class Nes {
     }
 
     private render () {
-        this.canvas?.getContext('2d').putImageData(new ImageData(this.#vm.get_framebuffer(), 256, 240), 0, 0);
+        this.canvas?.getContext('2d').putImageData(new ImageData(this.#vm.get_framebuffer(), Nes.VIDEO_WIDTH, Nes.VIDEO_HEIGHT), 0, 0);
     }
 
     get status () {

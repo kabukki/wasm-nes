@@ -105,7 +105,11 @@ impl Cartridge {
     pub fn read_prg (&self, address: u16) -> u8 {
         self.mapper.read_prg(address, &self.prg_ram, &self.prg_rom)
     }
-        
+
+    pub fn peek_prg (&self, address: u16) -> Option<u8> {
+        self.mapper.peek_prg(address, &self.prg_ram, &self.prg_rom)
+    }
+
     pub fn write_prg (&mut self, address: u16, data: u8) {
         // println!("Write PRG @ {:#x} <- {:#x}", address, data);
         self.mapper.write_prg(address, data, &mut self.prg_ram);

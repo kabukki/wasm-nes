@@ -73,7 +73,28 @@ impl super::Mapper for Mapper001 {
             _ => panic!("Invalid PRG read {:#x}", address),
         }
     }
-        
+
+    fn peek_prg (&self, address: u16, prg_ram: &Vec<u8>, prg_rom: &Vec<u8>) -> Option<u8> {
+        match address {
+            0x6000 ..= 0x7FFF => Some(prg_ram[(address as usize - 0x6000) % prg_ram.len()]),
+            0x8000 ..= 0xFFFF => Some(match (self.ctrl & 0b0000_1100) >> 2 {
+                0b00 | 0b01 => prg_rom[((self.prg_bank & 0b0001_1110) as usize * Mapper001::PRG_WINDOW_LARGE) + (address as usize % Mapper001::PRG_WINDOW_LARGE)],
+                0b10 => match address {
+                    0x8000 ..= 0xBFFF => prg_rom[address as usize % Mapper001::PRG_WINDOW],
+                    0xC000 ..= 0xFFFF => prg_rom[(self.prg_bank as usize * Mapper001::PRG_WINDOW) + (address as usize % Mapper001::PRG_WINDOW)],
+                    _ => unreachable!(),
+                },
+                0b11 => match address {
+                    0x8000 ..= 0xBFFF => prg_rom[(self.prg_bank as usize * Mapper001::PRG_WINDOW) + (address as usize % Mapper001::PRG_WINDOW)],
+                    0xC000 ..= 0xFFFF => prg_rom[(prg_rom.len() - Mapper001::PRG_WINDOW) + (address as usize % Mapper001::PRG_WINDOW)],
+                    _ => unreachable!(),
+                },
+                _ => unreachable!(),
+            }),
+            _ => None,
+        }
+    }
+
     fn write_prg (&mut self, address: u16, data: u8, prg_ram: &mut Vec<u8>) {
         match address {
             0x6000 ..= 0x7FFF => {

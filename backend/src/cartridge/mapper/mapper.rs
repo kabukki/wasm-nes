@@ -20,6 +20,7 @@ pub trait Mapper {
     fn read_chr (&self, address: u16, chr: &Vec<u8>) -> u8;
     fn write_chr (&mut self, address: u16, data: u8, chr: &mut Vec<u8>);
     fn read_prg (&self, address: u16, prg_ram: &Vec<u8>, prg_rom: &Vec<u8>) -> u8;
+    fn peek_prg (&self, address: u16, prg_ram: &Vec<u8>, prg_rom: &Vec<u8>) -> Option<u8>;
     fn write_prg (&mut self, address: u16, data: u8, prg_ram: &mut Vec<u8>);
     fn get_mirroring (&self) -> Option<cartridge::Mirroring>;
     // Debug utilities

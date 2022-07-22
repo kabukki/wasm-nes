@@ -34,7 +34,14 @@ impl super::Mapper for Mapper066 {
             _ => panic!("Invalid PRG read {:#x}", address),
         }
     }
-        
+
+    fn peek_prg (&self, address: u16, _prg_ram: &Vec<u8>, prg_rom: &Vec<u8>) -> Option<u8> {
+        match address {
+            0x8000 ..= 0xFFFF => Some(prg_rom[(self.prg_bank as usize * Mapper066::PRG_WINDOW) + (address as usize % Mapper066::PRG_WINDOW)]),
+            _ => None,
+        }
+    }
+
     fn write_prg (&mut self, address: u16, data: u8, _prg_ram: &mut Vec<u8>) {
         match address {
             0x8000 ..= 0xFFFF => {

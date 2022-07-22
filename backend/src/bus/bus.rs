@@ -63,7 +63,7 @@ impl Bus {
             0x4016 =>               self.controllers[0].peek(),
             0x4017 =>               self.controllers[1].peek(),
             0x4018 ..= 0x401F =>    None,
-            0x4020 ..= 0xFFFF =>    Some(self.cartridge.read_prg(address)),
+            0x4020 ..= 0xFFFF =>    self.cartridge.peek_prg(address),
         }
     }
 

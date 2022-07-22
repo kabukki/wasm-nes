@@ -673,7 +673,7 @@ impl Ppu {
                 self.write_vram(cartridge, self.cur_address, data);
                 self.cur_address += if (self.ctrl & CtrlFlag::Increment as u8) > 0 { 32 } else { 1 };
             },
-            _ => panic!("Invalid I/O write @ {:#x}", address),
+            _ => {}, // panic!("Invalid I/O write @ {:#x}", address),
         }
     }
 

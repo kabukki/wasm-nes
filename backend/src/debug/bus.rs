@@ -14,4 +14,8 @@ impl Emulator {
     pub fn debug_bus_dma (&mut self) -> JsValue {
         JsValue::from_serde(&self.bus.dma).unwrap()
     }
+
+    pub fn debug_bus_at (&mut self, address: u16) -> Vec<JsValue> {
+        (address as usize .. address as usize + 16).map(|n| self.bus.peek(n as u16).map_or(JsValue::null(), JsValue::from)).collect()
+    }
 }

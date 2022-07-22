@@ -55,6 +55,18 @@ impl Bus {
         data
     }
 
+    pub fn peek (&self, address: u16) -> Option<u8> {
+        match address {
+            0x0000 ..= 0x1FFF =>    Some(self.wram[address as usize % 0x800]),
+            0x2000 ..= 0x3FFF =>    self.ppu.peek(address),
+            0x4000 ..= 0x4015 =>    self.apu.peek(address),
+            0x4016 =>               self.controllers[0].peek(),
+            0x4017 =>               self.controllers[1].peek(),
+            0x4018 ..= 0x401F =>    None,
+            0x4020 ..= 0xFFFF =>    Some(self.cartridge.read_prg(address)),
+        }
+    }
+
     pub fn write (&mut self, address: u16, data: u8) {
         match address {
             0x0000 ..= 0x1FFF => {

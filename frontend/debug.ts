@@ -21,11 +21,15 @@ class Memoizable {
 }
 
 class DebugBus extends Memoizable {
-    constructor (vm: Emulator) {
+    constructor (private vm: Emulator) {
         super();
         this.memoize('ram', () => vm.debug_bus_ram());
         this.memoize('stack', () => vm.debug_bus_stack());
         this.memoize('dma', () => vm.debug_bus_dma());
+    }
+
+    at (address: number) {
+        return this.vm.debug_bus_at(address);
     }
 }
 
@@ -38,7 +42,6 @@ class DebugCartridge extends Memoizable {
         this.memoize('prgCapacity',     () => vm.debug_cartridge_prg_capacity());
         this.memoize('chrCurrent',      () => vm.debug_cartridge_chr_current());
         this.memoize('chrCapacity',     () => vm.debug_cartridge_chr_capacity());
-        this.memoize('ram',             () => vm.debug_cartridge_ram());
     }
 }
 

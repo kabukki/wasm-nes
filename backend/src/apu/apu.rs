@@ -186,10 +186,14 @@ impl Apu {
                 self.status &= !(StatusFlag::FrameInterrupt as u8);
                 status
             },
-            _ => {
-                log::warn!("Invalid APU read @ {:#x}", address);
-                0
-            },
+            _ => panic!("Invalid APU read @ {:#x}", address),
+        }
+    }
+
+    pub fn peek (&self, address: u16) -> Option<u8> {
+        match address {
+            0x4015 => Some(self.status),
+            _ => None,
         }
     }
 

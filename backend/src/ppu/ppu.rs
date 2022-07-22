@@ -608,6 +608,15 @@ impl Ppu {
         }
     }
 
+    pub fn peek (&self, address: u16) -> Option<u8> {
+        match (address % 8) + 0x2000 {
+            0x2002 => Some(self.status),
+            0x2004 => Some(self.oam[self.oam_address as usize]),
+            0x2007 => Some(self.read_buffer),
+            _ => None
+        }
+    }
+
     /**
      * Write to registers
      * https://wiki.nesdev.com/w/index.php/PPU_scrolling
@@ -664,7 +673,7 @@ impl Ppu {
                 self.write_vram(cartridge, self.cur_address, data);
                 self.cur_address += if (self.ctrl & CtrlFlag::Increment as u8) > 0 { 32 } else { 1 };
             },
-            _ => {}, // panic!("Invalid I/O write @ {:#x}", address),
+            _ => panic!("Invalid I/O write @ {:#x}", address),
         }
     }
 

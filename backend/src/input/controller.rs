@@ -41,6 +41,10 @@ impl Controller {
         data
     }
 
+    pub fn peek (&self) -> Option<u8> {
+        Some(self.shift & 1)
+    }
+
     pub fn write (&mut self, data: u8) {
         self.strobe = (data & 1) == 1;
         if self.strobe {

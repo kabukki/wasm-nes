@@ -47,8 +47,4 @@ impl Emulator {
             img.into_vec()
         }).collect::<Vec<Vec<u8>>>()).unwrap()
     }
-
-    pub fn debug_cartridge_ram (&mut self) -> Vec<u8> {
-        self.bus.cartridge.prg_ram.to_vec()
-    }
 }

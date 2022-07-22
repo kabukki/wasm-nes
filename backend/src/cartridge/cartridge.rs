@@ -7,7 +7,7 @@ const RAM_BANK_SIZE: usize = 0x2000; // 8 KiB
 
 enum ControlFlag1 {
     Vertical    =   0b0000_0001,
-    _Ram        =   0b0000_0010,
+    Ram         =   0b0000_0010,
     Trainer     =   0b0000_0100,
     FourScreen  =   0b0000_1000,
     Mapper      =   0b1111_0000, // Lower nibble of mapper number
@@ -56,8 +56,9 @@ impl Cartridge {
         let chr_banks = header[5] as usize; 
         let chr_type = if chr_banks > 0 { ChrType::ROM } else { ChrType::RAM };
         let mapper = (header[6] & ControlFlag1::Mapper as u8) >> 4 | (header[7] & ControlFlag2::Mapper as u8);
-        let trainer = header[6] & ControlFlag1::Trainer as u8 != 0;
-        let ram = header[8] as usize;
+        let trainer = (header[6] & ControlFlag1::Trainer as u8) != 0;
+        let ram = (header[6] & ControlFlag1::Ram as u8) != 0;
+        let ram_size = header[8] as usize;
         let mirroring = match (header[6] & ControlFlag1::FourScreen as u8 != 0, header[6] & ControlFlag1::Vertical as u8 != 0) {
             (true, _)       => Mirroring::FourScreen,
             (false, false)  => Mirroring::Horizontal,
@@ -65,7 +66,7 @@ impl Cartridge {
         };
 
         let mut cartridge = Cartridge {
-            prg_ram: vec![0; std::cmp::max(ram, 1) * RAM_BANK_SIZE], // Value 0 infers 8 KB for compatibility
+            prg_ram: vec![0; std::cmp::max(ram_size, 1) * RAM_BANK_SIZE], // Value 0 infers 8 KB for compatibility
             prg_rom: vec![0; prg_banks * PRG_BANK_SIZE],
             chr: vec![0; std::cmp::max(chr_banks, 1) * CHR_BANK_SIZE], // No distinction between CHR ROM and RAM
             mirroring,

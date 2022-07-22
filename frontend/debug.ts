@@ -20,7 +20,7 @@ class Memoizable {
     }
 }
 
-class Bus extends Memoizable {
+class DebugBus extends Memoizable {
     constructor (vm: Emulator) {
         super();
         this.memoize('ram', () => vm.debug_bus_ram());
@@ -29,17 +29,20 @@ class Bus extends Memoizable {
     }
 }
 
-class Cartridge extends Memoizable {
+class DebugCartridge extends Memoizable {
     constructor (vm: Emulator) {
         super();
         this.memoize('ines',            () => vm.debug_cartridge_ines());
-        this.memoize('patternTables',  () => vm.debug_cartridge_pattern_tables());
-        this.memoize('prgCurrent',      () => vm.debug_cartridge_current_prg());
-        this.memoize('chrCurrent',      () => vm.debug_cartridge_current_chr());
+        this.memoize('patternTables',   () => vm.debug_cartridge_pattern_tables());
+        this.memoize('prgCurrent',      () => vm.debug_cartridge_prg_current());
+        this.memoize('prgCapacity',     () => vm.debug_cartridge_prg_capacity());
+        this.memoize('chrCurrent',      () => vm.debug_cartridge_chr_current());
+        this.memoize('chrCapacity',     () => vm.debug_cartridge_chr_capacity());
+        this.memoize('ram',             () => vm.debug_cartridge_ram());
     }
 }
 
-class Disassembly extends Memoizable {
+class DebugDisassembly extends Memoizable {
     constructor (private vm: Emulator) {
         super();
         this.memoize('total', () => vm.debug_disassembly_total());
@@ -58,7 +61,7 @@ class Disassembly extends Memoizable {
     }
 }
 
-class Cpu extends Memoizable {
+class DebugCpu extends Memoizable {
     constructor (vm: Emulator) {
         super();
         this.memoize('clock', () => vm.debug_cpu_clock());
@@ -73,7 +76,7 @@ class Cpu extends Memoizable {
     }
 }
 
-class Ppu extends Memoizable {
+class DebugPpu extends Memoizable {
     constructor (vm: Emulator) {
         super();
         this.memoize('clock', () => vm.debug_ppu_clock());
@@ -90,15 +93,23 @@ class Ppu extends Memoizable {
     }
 }
 
+class DebugApu extends Memoizable {
+    constructor (vm: Emulator) {
+        super();
+        this.memoize('clock', () => vm.debug_apu_clock());
+    }
+}
+
 export class Debug extends Memoizable {
     constructor (vm: Emulator) {
         super();
-        this.memoize('bus', () => new Bus(vm));
-        this.memoize('cartridge', () => new Cartridge(vm));
+        this.memoize('apu', () => new DebugApu(vm));
+        this.memoize('bus', () => new DebugBus(vm));
+        this.memoize('cartridge', () => new DebugCartridge(vm));
         this.memoize('clock', () => vm.debug_clock());
-        this.memoize('cpu', () => new Cpu(vm));
-        this.memoize('ppu', () => new Ppu(vm));
-        this.memoize('disassembly', () => new Disassembly(vm));
+        this.memoize('cpu', () => new DebugCpu(vm));
+        this.memoize('ppu', () => new DebugPpu(vm));
+        this.memoize('disassembly', () => new DebugDisassembly(vm));
         this.memoize('frame', () => vm.debug_ppu_frame());
         this.memoize('oam', () => vm.debug_ppu_oam());
         this.memoize('palettes', () => vm.debug_ppu_palettes());

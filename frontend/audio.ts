@@ -38,13 +38,15 @@ export class Audio {
 
     queue (chunk: Float32Array) {
         const node = this.#context.createBufferSource()
-        // node.buffer = await this.#context.decodeAudioData(next);
         node.buffer = this.#context.createBuffer(1, chunk.length, this.#context.sampleRate);
         node.buffer.copyToChannel(chunk, 0);
         node.connect(this.#gain);
         node.start(/* this.#context.currentTime + node.buffer.duration */);
-        console.log(this.#context.currentTime);
-        
+    }
+
+    fix () {
+        // iOS-specific
+        this.#context.resume();
     }
 
     get sampleRate () {

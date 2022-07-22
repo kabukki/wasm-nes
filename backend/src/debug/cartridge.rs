@@ -7,12 +7,20 @@ impl Emulator {
         JsValue::from_serde(&self.bus.cartridge.ines).unwrap()
     }
 
-    pub fn debug_cartridge_current_prg (&mut self) -> JsValue {
+    pub fn debug_cartridge_prg_current (&mut self) -> JsValue {
         JsValue::from_serde(&self.bus.cartridge.mapper.get_current_prg(&self.bus.cartridge.prg_rom)).unwrap()
     }
 
-    pub fn debug_cartridge_current_chr (&mut self) -> JsValue {
+    pub fn debug_cartridge_prg_capacity (&mut self) -> usize {
+        self.bus.cartridge.prg_rom.len()
+    }
+
+    pub fn debug_cartridge_chr_current (&mut self) -> JsValue {
         JsValue::from_serde(&self.bus.cartridge.mapper.get_current_chr(&self.bus.cartridge.chr)).unwrap()
+    }
+
+    pub fn debug_cartridge_chr_capacity (&mut self) -> usize {
+        self.bus.cartridge.chr.len()
     }
 
     pub fn debug_cartridge_pattern_tables (&mut self) -> JsValue {
@@ -38,5 +46,9 @@ impl Emulator {
 
             img.into_vec()
         }).collect::<Vec<Vec<u8>>>()).unwrap()
+    }
+
+    pub fn debug_cartridge_ram (&mut self) -> Vec<u8> {
+        self.bus.cartridge.prg_ram.to_vec()
     }
 }

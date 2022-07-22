@@ -11,6 +11,6 @@ pub struct InesHeader {
     pub chr_type: ChrType,
     pub mapper: u8,
     pub trainer: bool,
-    pub ram: usize,
+    pub ram: bool,
     pub mirroring: Mirroring,
 }

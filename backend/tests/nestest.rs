@@ -52,10 +52,9 @@ fn nestest () {
     let log: Vec<String> = BufReader::new(File::open("tests/roms/cpu/nestest/nestest.log").expect("Could not open log")).lines().map(|line| line.unwrap()).collect();
 
     let mut cpu = Cpu::new();
-    let mut bus = Bus::new(48_000.0);
+    let mut bus = Bus::new(&rom, 48_000.0);
     let mut cycles = 0;
 
-    bus.load(&rom);
     cpu.reset();
 
     for n in 0..log.len() {

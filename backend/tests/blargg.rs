@@ -1,4 +1,4 @@
-use wasm_nes::emulator::Emulator;
+use wasm_nes::Emulator;
 
 macro_rules! run {
     ($path:expr) => {

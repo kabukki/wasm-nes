@@ -2,15 +2,15 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub enum Button {
-    None    = 0b0000_0000,
-    A       = 0b0000_0001,
-    B       = 0b0000_0010,
-    Select  = 0b0000_0100,
-    Start   = 0b0000_1000,
-    Up      = 0b0001_0000,
-    Down    = 0b0010_0000,
-    Left    = 0b0100_0000,
-    Right   = 0b1000_0000,
+    None    = 0b00000000,
+    A       = 0b00000001,
+    B       = 0b00000010,
+    Select  = 0b00000100,
+    Start   = 0b00001000,
+    Up      = 0b00010000,
+    Down    = 0b00100000,
+    Left    = 0b01000000,
+    Right   = 0b10000000,
 }
 
 #[derive(Clone, Copy)]
@@ -42,7 +42,7 @@ impl Controller {
     }
 
     pub fn peek (&self) -> Option<u8> {
-        Some(self.shift & 1)
+        Some(self.state)
     }
 
     pub fn write (&mut self, data: u8) {

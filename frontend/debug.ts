@@ -118,5 +118,6 @@ export class Debug extends Memoizable {
         this.memoize('palettes', () => vm.debug_ppu_palettes());
         this.memoize('palette', () => vm.debug_ppu_palette());
         this.memoize('nametables', () => vm.debug_ppu_nametables());
+        this.memoize('input', () => vm.debug_input());
     }
 }

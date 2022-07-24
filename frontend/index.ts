@@ -1,7 +1,7 @@
 import GameStats from 'game-stats';
 
 import wasm from '../backend/pkg/index_bg.wasm';
-import init, { Emulator, set_panic_hook } from '../backend/pkg';
+import init, { Button, Emulator, set_panic_hook } from '../backend/pkg';
 import { Debug } from './debug';
 import { Logs } from './logs';
 import { Audio } from './audio';
@@ -106,6 +106,10 @@ export class Nes {
 
     private render () {
         this.canvas?.getContext('2d').putImageData(new ImageData(this.#vm.get_framebuffer(), Nes.VIDEO_WIDTH, Nes.VIDEO_HEIGHT), 0, 0);
+    }
+
+    input (player: number, button: Button, pressed: boolean) {
+        this.#vm.update_controller(player, button, pressed);
     }
 
     get status () {

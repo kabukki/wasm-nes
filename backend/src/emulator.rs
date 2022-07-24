@@ -1,24 +1,20 @@
 use wasm_bindgen::prelude::*;
-use crate::{
-    bus::Bus,
-    cpu::Cpu,
-    clock::Clock,
-};
+use crate::{bus, cpu, clock, input};
 
 #[wasm_bindgen]
 pub struct Emulator {
-    pub (crate) cpu: Cpu,
-    pub (crate) bus: Bus,
-    pub (crate) clock: Clock,
+    pub (crate) cpu: cpu::Cpu,
+    pub (crate) bus: bus::Bus,
+    pub (crate) clock: clock::Clock,
 }
 
 #[wasm_bindgen]
 impl Emulator {
     pub fn new (rom: Vec<u8>, sample_rate: f64) -> Self {
         let mut emulator = Self {
-            cpu: Cpu::new(),
-            bus: Bus::new(&rom, sample_rate),
-            clock: Clock::new(crate::clock::CLOCK_MASTER_NTSC),
+            cpu: cpu::Cpu::new(),
+            bus: bus::Bus::new(&rom, sample_rate),
+            clock: clock::Clock::new(crate::clock::CLOCK_MASTER_NTSC),
         };
 
         emulator.cpu.reset();
@@ -76,9 +72,11 @@ impl Emulator {
     //     self.clock.rate = crate::util::CLOCK_MASTER_PAL;
     // }
 
-    pub fn update_controllers (&mut self, data: &[u8]) {
-        self.bus.controllers[0].update(data[0]);
-        self.bus.controllers[1].update(data[1]);
+    pub fn update_controller (&mut self, player: usize, button: input::Button, pressed: bool) {
+        let state = self.bus.controllers[player].peek().unwrap();
+        let state = if pressed { state | button as u8 } else { state & !(button as u8)};
+
+        self.bus.controllers[player].update(state);
     }
 
     /**

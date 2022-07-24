@@ -1,0 +1,24 @@
+[package]
+name = "wasm-nes"
+version = "0.1.0"
+authors = ["Lucien Le Roux <lucien@le-roux.dev>"]
+edition = "2018"
+
+# Preserve debug symbols for profiling builds
+[package.metadata.wasm-pack.profile.profiling]
+wasm-opt = ["-O", "-g"]
+
+[dependencies]
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+serde = { version = "1.0", features = ["derive"] }
+log = { version = "0.4.16", features = ["std", "serde"] }
+js-sys = "0.3.51"
+wee_alloc = "0.4.5"
+image = "0.24.2"
+
+[dev-dependencies]
+colored = "2"
+
+[lib]
+name = "wasm_nes"
+crate-type = ["cdylib", "rlib"]

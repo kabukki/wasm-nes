@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+    <body>
+        <canvas style="display: block; width: 100%; aspect-ratio: 64 / 32; image-rendering: pixelated"></canvas>
+        <input type="file" />
+        <script type="module">
+            import { Nes } from '@kabukki/wasm-nes';
+
+            const canvas = document.querySelector('canvas');
+            canvas.width = Nes.VIDEO_WIDTH;
+            canvas.height = Nes.VIDEO_HEIGHT;
+
+            const input = document.querySelector('input');
+            input.addEventListener('change', async (e) => {
+                try {
+                    const rom = new Uint8Array(await e.target.files[0]?.arrayBuffer());
+                    const emulator = await Nes.new(rom)
+                    emulator.canvas = canvas;
+                    emulator.start();
+                } catch (err) {
+                    console.error(err);
+                }
+            });
+        </script>
+    </body>
+</html>
